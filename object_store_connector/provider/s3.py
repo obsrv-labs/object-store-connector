@@ -9,12 +9,9 @@ from obsrv.common import ObsrvException
 from obsrv.job.batch import get_base_conf
 from obsrv.connector import MetricsCollector
 from obsrv.models import ErrorData
-from obsrv.utils import LoggerController
 
 from provider.blob_provider import BlobProvider
 from models.object_info import ObjectInfo, Tag
-
-logger = LoggerController(__name__)
 class S3(BlobProvider):
     def __init__(self, connector_config) -> None:
         super().__init__()
@@ -63,7 +60,6 @@ class S3(BlobProvider):
             errors += 1
             labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
-            logger.exception(f"failed to fetch tags from S3: {str(exception)}")
             ObsrvException(ErrorData("S3_TAG_READ_ERROR", f"failed to fetch tags from S3: {str(exception)}"))
 
     def update_tag(self, object: ObjectInfo, tags: list, metrics_collector: MetricsCollector) -> bool:
@@ -89,7 +85,6 @@ class S3(BlobProvider):
             errors += 1
             labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
-            logger.exception(f"failed to update tags in S3: {str(exception)}")
             ObsrvException(ErrorData("S3_TAG_UPDATE_ERROR", f"failed to update tags in S3: {str(exception)}"))
 
     def fetch_objects(self, metrics_collector: MetricsCollector) -> List[ObjectInfo]:
@@ -137,14 +132,12 @@ class S3(BlobProvider):
             labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
             ObsrvException(ErrorData("S3_READ_ERROR", f"failed to read object from S3: {str(exception)}"))
-            logger.exception(f"failed to read object from S3: {str(exception)}")
             return None
         except Exception as exception:
             errors += 1
             labels += [{"key": "error_code", "value": "S3_READ_ERROR"}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
             ObsrvException(ErrorData("S3_READ_ERROR", f"failed to read object from S3: {str(exception)}"))
-            logger.exception(f"failed to read object from S3: {str(exception)}")
             return None
 
 
@@ -193,7 +186,6 @@ class S3(BlobProvider):
                 errors += 1
                 labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
                 metrics_collector.collect("num_errors", errors, addn_labels=labels)
-                logger.exception(f"failed to list objects in S3: {str(exception)}")
                 ObsrvException(ErrorData('AWS_S3_LIST_ERROR', f"failed to list objects in S3: {str(exception)}"))
 
         metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
