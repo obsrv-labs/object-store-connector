@@ -82,7 +82,7 @@ class ObjectStoreConnector(ISourceConnector):
             obj = self.objects[i]
             obj["start_processing_time"] = time.time()
 
-            df = self.provider.read_object(obj.get("location"), obj.get("num_of_retries"), sc=sc, metrics_collector=metrics_collector, file_format=self.data_format)
+            df = self.provider.read_object(obj.get("location"), sc=sc, metrics_collector=metrics_collector, file_format=self.data_format)
             df = self._append_custom_meta(sc, df, obj)
 
             if df is None:
