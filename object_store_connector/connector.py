@@ -1,7 +1,7 @@
 import time
 import json
 from typing import Any, Dict, Iterator
-
+import yaml
 from obsrv.common import ObsrvException
 from obsrv.connector.batch import ISourceConnector
 from obsrv.connector import ConnectorContext
@@ -11,6 +11,7 @@ from obsrv.models import ErrorData, StatusCode
 from pyspark.sql import SparkSession, DataFrame
 from pyspark.conf import SparkConf
 from pyspark.sql.functions import lit
+from pyspark.sql.types import *
 
 from provider.s3 import S3
 from models.object_info import ObjectInfo
@@ -23,13 +24,30 @@ class ObjectStoreConnector(ISourceConnector):
         self.success_state = StatusCode.SUCCESS.value
         self.error_state = StatusCode.FAILED.value
         self.data_format = None
+        with open('object_store_connector/config/config.yaml') as config_file:
+            config = yaml.safe_load(config_file)
+        self.max_retries = config['max_retries']
 
     def process(self, sc: SparkSession, ctx: ConnectorContext, connector_config: Dict[Any, Any], metrics_collector: MetricsCollector) -> Iterator[DataFrame]:
+        if ctx.state.get_state("Running", False):
+            print("Connector is already running. Skipping processing.")
+            return 
+
+        ctx.state.put_state("Running", True)
+        ctx.state.save_state()
+
+        last_run_time = time.time()
+        ctx.state.put_state("last_run_time", last_run_time)
+        ctx.state.save_state()
         self._get_provider(connector_config)
         self._get_objects_to_process(ctx, metrics_collector)
         self.data_format = connector_config['data_format']
         for res in self._process_objects(sc, ctx, metrics_collector):
             yield res
+        
+        ctx.state.put_state("Running", False)
+        ctx.state.put_state("last_run_time", last_run_time)
+        ctx.state.save_state()
 
     def get_spark_conf(self, connector_config) -> SparkConf:
         self._get_provider(connector_config)
@@ -56,25 +74,42 @@ class ObjectStoreConnector(ISourceConnector):
             ctx.state.save_state()
 
         self.objects = objects
+        ctx.stats.put_stat("num_files_discovered", len(objects))
+        ctx.stats.save_stats()
 
     def _process_objects(self, sc: SparkSession, ctx: ConnectorContext, metrics_collector: MetricsCollector) -> Iterator[DataFrame]:
         for i in range(0, len(self.objects[:1])):
             obj = self.objects[i]
             obj["start_processing_time"] = time.time()
 
-            df = self.provider.read_object(obj.get("location"), sc=sc, metrics_collector=metrics_collector, file_format=self.data_format)
+            df = self.provider.read_object(obj.get("location"), obj.get("num_of_retries"), sc=sc, metrics_collector=metrics_collector, file_format=self.data_format)
             df = self._append_custom_meta(sc, df, obj)
 
-            obj["download_time"] = time.time()-obj.get("start_processing_time")
+            if df is None:
+                obj.num_of_retries += 1
 
-            self.provider.update_tag(object=obj, tags=[{"key": self.dedupe_tag, "value": self.success_state}], metrics_collector=metrics_collector)
+                if obj.num_of_retries > self.max_retries: #TODO: read from config
+                    ctx.state.put_state("to_failed", self.objects[i+1:])
+                    ctx.stats.put_stat("num_errors", len(self.objects[i+1:]))
+                    ctx.stats.save_stats()
+                else:
+                    ctx.state.put_state("to_process", self.objects[i])
+                    ctx.stats.put_stat("num_files_processed", len(self.objects[i]))
+                yield spark.createDataFrame(data=[], schema=df.schema) # return an empty dataframe
+            else: 
+                df = self._append_custom_meta(sc, df, obj)
 
-            ctx.state.put_state("to_process", self.objects[i+1:])
-            ctx.state.save_state()
+                obj["download_time"] = time.time()-obj.get("start_processing_time")
 
-            obj["end_processing_time"] = time.time()
+                self.provider.update_tag(object=obj, tags=[{"key": self.dedupe_tag, "value": self.success_state}], metrics_collector=metrics_collector)
+                ctx.state.put_state("to_process", self.objects[i+1:])
+                ctx.state.save_state()
+                ctx.stats.put_stat("num_files_processed", len(self.objects[i+1:]))
+                obj["end_processing_time"] = time.time()
 
-            yield df
+                yield df
+            
+        ctx.stats.save_stats()
 
     def _append_custom_meta(self, sc: SparkSession, df: DataFrame, object: ObjectInfo) -> DataFrame:
         addn_meta = {
@@ -93,8 +128,7 @@ class ObjectStoreConnector(ISourceConnector):
     def _exclude_processed_objects(self, objects):
         to_be_processed = []
         for obj in objects:
-            if not any(tag["key"] == self.dedupe_tag and tag["value"] == self.success_state for tag in obj.get("tags")):
+            if not any(tag["key"] == self.dedupe_tag for tag in obj.get("tags")):
                 to_be_processed.append(obj)
 
-        # return [objects[-1]] #TODO: Remove this line
         return to_be_processed

@@ -9,10 +9,12 @@ from obsrv.common import ObsrvException
 from obsrv.job.batch import get_base_conf
 from obsrv.connector import MetricsCollector
 from obsrv.models import ErrorData
+from obsrv.utils import LoggerController
 
 from provider.blob_provider import BlobProvider
 from models.object_info import ObjectInfo, Tag
 
+logger = LoggerController(__name__)
 class S3(BlobProvider):
     def __init__(self, connector_config) -> None:
         super().__init__()
@@ -61,7 +63,8 @@ class S3(BlobProvider):
             errors += 1
             labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
-            raise ObsrvException(ErrorData("S3_TAG_READ_ERROR", f"failed to fetch tags from S3: {str(exception)}"))
+            logger.exception(f"failed to fetch tags from S3: {str(exception)}")
+            ObsrvException(ErrorData("S3_TAG_READ_ERROR", f"failed to fetch tags from S3: {str(exception)}"))
 
     def update_tag(self, object: ObjectInfo, tags: list, metrics_collector: MetricsCollector) -> bool:
         labels = [
@@ -86,7 +89,8 @@ class S3(BlobProvider):
             errors += 1
             labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
-            raise ObsrvException(ErrorData("S3_TAG_UPDATE_ERROR", f"failed to update tags in S3: {str(exception)}"))
+            logger.exception(f"failed to update tags in S3: {str(exception)}")
+            ObsrvException(ErrorData("S3_TAG_UPDATE_ERROR", f"failed to update tags in S3: {str(exception)}"))
 
     def fetch_objects(self, metrics_collector: MetricsCollector) -> List[ObjectInfo]:
         objects = self._list_objects(metrics_collector=metrics_collector)
@@ -111,7 +115,6 @@ class S3(BlobProvider):
         ]
         # file_format = self.connector_config.get("fileFormat", {}).get("type", "jsonl")
         api_calls, errors, records_count = 0, 0, 0
-
         try:
             if file_format == "jsonl":
                 df = sc.read.format("json").load(object_path)
@@ -127,19 +130,23 @@ class S3(BlobProvider):
                 raise ObsrvException(ErrorData("UNSUPPORTED_FILE_FORMAT", f"unsupported file format: {file_format}"))
             records_count = df.count()
             api_calls += 1
-
             metrics_collector.collect({"num_api_calls": api_calls, "num_records": records_count}, addn_labels=labels)
             return df
         except (BotoCoreError, ClientError) as exception:
             errors += 1
             labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
-            raise ObsrvException(ErrorData("S3_READ_ERROR", f"failed to read object from S3: {str(exception)}"))
+            ObsrvException(ErrorData("S3_READ_ERROR", f"failed to read object from S3: {str(exception)}"))
+            logger.exception(f"failed to read object from S3: {str(exception)}")
+            return None
         except Exception as exception:
             errors += 1
             labels += [{"key": "error_code", "value": "S3_READ_ERROR"}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
-            raise ObsrvException(ErrorData("S3_READ_ERROR", f"failed to read object from S3: {str(exception)}"))
+            ObsrvException(ErrorData("S3_READ_ERROR", f"failed to read object from S3: {str(exception)}"))
+            logger.exception(f"failed to read object from S3: {str(exception)}")
+            return None
+
 
     def _get_client(self):
         session = boto3.Session(
@@ -154,7 +161,13 @@ class S3(BlobProvider):
         prefix = self.prefix
         summaries = []
         continuation_token = None
-
+        file_format = self.connector_config.get("data_format", {})
+        file_formats = {
+            "json": ["json", "json.gz", "json.zip"],
+            "jsonl": ["json", "json.gz", "json.zip"],
+            "csv": ["csv", "csv.gz", "csv.zip"]
+        }
+        
         # metrics
         api_calls, errors = 0, 0
 
@@ -170,7 +183,9 @@ class S3(BlobProvider):
                 else:
                     objects = self.s3_client.list_objects_v2(Bucket=bucket_name, Prefix=prefix)
                 api_calls += 1
-                summaries.extend(objects.get('Contents', []))
+                for obj in objects['Contents']:
+                    if any(obj['Key'].endswith(f) for f in file_formats[file_format]):
+                        summaries.append(obj)
                 if not objects.get('IsTruncated'):
                     break
                 continuation_token = objects.get('NextContinuationToken')
@@ -178,7 +193,8 @@ class S3(BlobProvider):
                 errors += 1
                 labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
                 metrics_collector.collect("num_errors", errors, addn_labels=labels)
-                raise ObsrvException(ErrorData('AWS_S3_LIST_ERROR', f"failed to list objects in S3: {str(exception)}"))
+                logger.exception(f"failed to list objects in S3: {str(exception)}")
+                ObsrvException(ErrorData('AWS_S3_LIST_ERROR', f"failed to list objects in S3: {str(exception)}"))
 
         metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
         return summaries
