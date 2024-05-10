@@ -13,8 +13,6 @@ from obsrv.job.batch import get_base_conf
 from google.api_core.exceptions import ClientError
 from provider.blob_provider import BlobProvider
 
-
-
 class GCS(BlobProvider):
     def __init__(self, connector_config) -> None:
             self.key_path = "/tmp/key.json"
@@ -120,7 +118,6 @@ class GCS(BlobProvider):
             return False
      
 
-  
     def fetch_objects(self,metrics_collector: MetricsCollector) -> List[ObjectInfo]:
         try:
             objects = self._list_objects(metrics_collector=metrics_collector)
@@ -146,7 +143,6 @@ class GCS(BlobProvider):
         except Exception as e:
             print(f"Error fetching objects: {str(e)}")
             return []
-
 
 
     def read_object(self, object_path: str, sc: SparkSession,metrics_collector:MetricsCollector, file_format: str) -> DataFrame:
@@ -180,8 +176,6 @@ class GCS(BlobProvider):
         except Exception as exception:
             metrics_collector.collect("num_errors", addn_labels=labels)
             raise Exception(f"failed to read object from GCS: {str(exception)}")
-
-
 
     
     def _list_objects(self,metrics_collector:MetricsCollector):
