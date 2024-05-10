@@ -33,7 +33,7 @@ class ObjectStoreConnector(ISourceConnector):
 
     def process(self, sc: SparkSession, ctx: ConnectorContext, connector_config: Dict[Any, Any], metrics_collector: MetricsCollector) -> Iterator[DataFrame]:
         if ctx.state.get_state("STATUS", default_value=self.not_running_state):
-            logger.info("Connector is already running. Skipping processing.") #TODO: use logger
+            logger.info("Connector is already running. Skipping processing.")
             return 
 
         ctx.state.put_state("STATUS", self.running_state)
@@ -46,7 +46,6 @@ class ObjectStoreConnector(ISourceConnector):
             self.max_retries = connector_config["max_retries"]
         else:
             self.max_retries = 10
-        print(self.max_retries)
         self.objects_to_process = ctx.state.get_state("to_process")
         self._get_provider(connector_config)
         self._get_objects_to_process(ctx, metrics_collector)
@@ -69,15 +68,12 @@ class ObjectStoreConnector(ISourceConnector):
             raise ObsrvException(ErrorData("INVALID_PROVIDER", "provider not supported: {}".format(connector_config["type"])))
 
     def _get_objects_to_process(self, ctx: ConnectorContext, metrics_collector: MetricsCollector) -> None:
-        print("Objects to process..")
         objects = ctx.state.get_state("to_process", list())
-        print("Objects in to process state: ", objects)
         if ctx.building_block is not None and ctx.env is not None:
             self.dedupe_tag = "{}-{}".format(ctx.building_block, ctx.env)
         else:
             raise ObsrvException(ErrorData("INVALID_CONTEXT", "building_block or env not found in context"))
         if not len(objects):
-            print("If no objects in to process state..")
             objects = self.provider.fetch_objects(ctx, metrics_collector)
             objects = self._exclude_processed_objects(ctx, objects)
             metrics_collector.collect("new_objects_discovered", len(objects))
@@ -85,8 +81,7 @@ class ObjectStoreConnector(ISourceConnector):
             ctx.state.save_state()
 
         self.objects = objects
-        ctx.stats.put_stat("num_files_discovered", len(self.objects))
-        print("Discovered: ", ctx.stats.get_stat("num_files_discovered"))   
+        ctx.stats.put_stat("num_files_discovered", len(self.objects))  
         ctx.stats.save_stats()
 
     def _process_objects(self, sc: SparkSession, ctx: ConnectorContext, metrics_collector: MetricsCollector) -> Iterator[DataFrame]:
