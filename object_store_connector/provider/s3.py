@@ -99,7 +99,6 @@ class S3(BlobProvider):
                 tags=self.fetch_tags(obj['Key'], metrics_collector)
             )
             objects_info.append(object_info.to_json())
-
         return objects_info
 
     def read_object(self, object_path: str, sc: SparkSession, metrics_collector: MetricsCollector, file_format: str) -> DataFrame:
@@ -108,19 +107,16 @@ class S3(BlobProvider):
             {"key": "method_name", "value": "getObject"},
             {"key": "object_path", "value": object_path}
         ]
-        # file_format = self.connector_config.get("fileFormat", {}).get("type", "jsonl")
         api_calls, errors, records_count = 0, 0, 0
         try:
             if file_format == "jsonl":
                 df = sc.read.format("json").load(object_path)
             elif file_format == "json":
                 df = sc.read.format("json").option("multiLine", True).load(object_path)
-            elif file_format == "json.gz":
-                df = sc.read.format("json").option("compression", "gzip").option("multiLine", True).load(object_path)
             elif file_format == "csv":
                 df = sc.read.format("csv").option("header", True).load(object_path)
-            elif file_format == "csv.gz":
-                df = sc.read.format("csv").option("header", True).option("compression", "gzip").load(object_path)
+            elif file_format == "parquet":
+                df = sc.read.format("parquet").load(object_path)
             else:
                 raise ObsrvException(ErrorData("UNSUPPORTED_FILE_FORMAT", f"unsupported file format: {file_format}"))
             records_count = df.count()
@@ -154,7 +150,6 @@ class S3(BlobProvider):
         prefix = self.prefix
         summaries = []
         continuation_token = None
-        file_format = self.connector_config.get("data_format", {})
         file_formats = {
             "json": ["json", "json.gz", "json.zip"],
             "jsonl": ["json", "json.gz", "json.zip"],
