@@ -13,6 +13,8 @@ from obsrv.job.batch import get_base_conf
 from google.api_core.exceptions import ClientError
 from provider.blob_provider import BlobProvider
 
+
+
 class GCS(BlobProvider):
     def __init__(self, connector_config) -> None:
             self.key_path = "/tmp/key.json"
