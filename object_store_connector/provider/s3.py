@@ -5,6 +5,7 @@ import json
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.conf import SparkConf
 
+from obsrv.connector import ConnectorContext
 from obsrv.common import ObsrvException
 from obsrv.job.batch import get_base_conf
 from obsrv.connector import MetricsCollector
@@ -87,8 +88,8 @@ class S3(BlobProvider):
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
             ObsrvException(ErrorData("S3_TAG_UPDATE_ERROR", f"failed to update tags in S3: {str(exception)}"))
 
-    def fetch_objects(self, metrics_collector: MetricsCollector) -> List[ObjectInfo]:
-        objects = self._list_objects(metrics_collector=metrics_collector)
+    def fetch_objects(self, ctx: ConnectorContext, metrics_collector: MetricsCollector) -> List[ObjectInfo]:
+        objects = self._list_objects(ctx, metrics_collector=metrics_collector)
         objects_info = []
         for obj in objects:
             object_info = ObjectInfo(
@@ -145,7 +146,7 @@ class S3(BlobProvider):
         )
         return session.client("s3")
 
-    def _list_objects(self, metrics_collector) -> list:
+    def _list_objects(self, ctx: ConnectorContext, metrics_collector) -> list:
         bucket_name = self.connector_config['bucket']
         prefix = self.prefix
         summaries = []
@@ -155,7 +156,7 @@ class S3(BlobProvider):
             "jsonl": ["json", "json.gz", "json.zip"],
             "csv": ["csv", "csv.gz", "csv.zip"]
         }
-        
+        file_format = ctx.data_format
         # metrics
         api_calls, errors = 0, 0
 
