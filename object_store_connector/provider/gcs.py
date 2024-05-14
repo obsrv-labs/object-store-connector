@@ -7,11 +7,10 @@ from pyspark.conf import SparkConf
 from models.object_info import Tag,ObjectInfo
 from pyspark.sql import SparkSession
 from obsrv.connector import MetricsCollector
-import json
-from obsrv.common import ObsrvException
 from obsrv.job.batch import get_base_conf
 from google.api_core.exceptions import ClientError
 from provider.blob_provider import BlobProvider
+import json
 
 class GCS(BlobProvider):
     def __init__(self, connector_config) -> None:
@@ -56,105 +55,109 @@ class GCS(BlobProvider):
             conf.set("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS") 
             return conf
 
-
-    def fetch_tags(self, object_path: str) -> List[Tag]:
+    
+    def fetch_tags(self, object_path: str, metrics_collector: MetricsCollector) -> List[Tag]:
+        labels = [
+            {"key": "request_method", "value": "GET"},
+            {"key": "method_name", "value": "getObjectTagging"},
+            {"key": "object_path", "value": object_path}
+        ]
+        api_calls, errors = 0, 0
         try:
+            relative_path = object_path.replace("gs://" + self.bucket + "/", "")
             bucket = self.gcs_client.bucket(self.bucket)
-            blob = bucket.blob(object_path)
-            if not blob.exists():
+            blob = bucket.get_blob(relative_path)
+            if blob is None:
                 print(f"Object '{object_path}' not found in bucket '{self.bucket}'.")
                 return []
+            api_calls += 1
             # Fetch metadata from the object
             blob.reload()
             metadata = blob.metadata
+            tags = []
             if metadata:
-                # return [Tag(tag['Key'], tag['Value']) for tag in tags]
-                metadata_list = [Tag(key, value) for key, value in metadata.items()]
-
-                print(f"Metadata fetched for object '{object_path}': {metadata_list}")
-                return metadata_list
+                for key, value in metadata.items():
+                    tags.append({'Key': key, 'Value': value})
+                metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
+                print(f"Tags:{tags}")
             else:
                 print(f"No metadata found for object '{object_path}'.")
                 return []
         except Exception as e:
+            metrics_collector.collect("num_errors", errors, addn_labels=labels)
             print(f"Error fetching metadata: {str(e)}")
             return []
+        return tags
 
-
-    def update_tag(self, object: ObjectInfo, tags: List[Tag],metrics_collector:MetricsCollector) -> bool:
-        bucket=self.connector_config['bucket']
+    
+    def update_tag(self, object: ObjectInfo, tags: List[Tag], metrics_collector: MetricsCollector) -> bool:
+        object_path = object.get('location')
+        print(object_path)
         labels = [
             {"key": "request_method", "value": "PUT"},
             {"key": "method_name", "value": "setObjectTagging"},
-            {"key": "object_path", "value": object.get('location')}
+            {"key": "object_path", "value": object_path}
         ]
-        api_calls=0
+        api_calls,errors= 0,0
         try:
-            blob = self.gcs_client.bucket(object)
-            # Check if the object exists
-            if not blob.exists():
-                print(f"Object '{object}' not found in bucket '{bucket}'.")
-                return False
-            # Fetch existing metadata
+            # Get the bucket
+            relative_path = object_path.replace("gs://" + self.bucket + "/", "")
+            bucket = self.gcs_client.bucket(self.bucket)
+            blob = bucket.get_blob(relative_path)
             blob.reload()
             existing_metadata = blob.metadata
-            # Check if the key already exists in the existing metadata
-            for item in tags:
-                key = item["key"]
-                value = item["value"]
+            print(f"Present:{existing_metadata}")
+            # Convert the list of Tag objects into a list of dictionaries
+            tags_dict = [{tag.key: tag.value} for tag in tags]
+            for item in tags_dict:
+                key = list(item.keys())[0]
+                value = item[key]
+                print(item)
                 if key in existing_metadata:
-                    print(f"Key '{key}' already exists in existing metadata for object '{object}'.")
+                    print(f"Key '{key}' already exists in existing metadata for object '.")
                     return False
                 existing_metadata[key] = value
             # Update metadata for the object
             blob.metadata = existing_metadata
             blob.patch()
-            print(f"Metadata updated for object '{object}'.")
+            metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
             return True
-        except Exception as e:
-            metrics_collector.collect("num_errors", addn_labels=labels)
+        except (ClientError) as exception:
+            errors+=1
+            labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
+            metrics_collector.collect("num_errors",errors, addn_labels=labels)
             print(f"Error updating metadata: {str(e)}")
-            metrics_collector.collect("num_api_calls",api_calls)
-            return False
-     
-
-    def fetch_objects(self,metrics_collector: MetricsCollector) -> List[ObjectInfo]:
-        try:
-            objects = self._list_objects(metrics_collector=metrics_collector)
-            objects_info = []
-            if not objects:
-                print(f"No objects found")
-                return []
-            objects_info = []
-            for obj in objects:
-                # print(obj.name)
-                object_info = ObjectInfo(
-                    id=str(uuid4()),
-                    location=f"{self.obj_prefix}{obj.name}",  # Accessing blob's name
-                    # format=obj['name'].split(".")[-1],  # Extracting format from the name
-                    file_size_kb=obj.size // 1024,
-                    file_hash=obj.etag.strip('"')
-                    # tags=self.gcs_client.fetch_tags(obj['Key'], metrics_collector)
-                )
-            print(f"{self.obj_prefix}")
-            objects_info.append(object_info.to_json())
-            print(objects_info) 
-            return objects_info
-        except Exception as e:
-            print(f"Error fetching objects: {str(e)}")
+            raise Exception( f"failed to update tags in S3: {str(exception)}")
+            
+  
+    def fetch_objects(self, metrics_collector: MetricsCollector) -> List[ObjectInfo]:
+        objects = self._list_objects(metrics_collector=metrics_collector)
+        objects_info = []
+        if not objects:
+            print(f"No objects found")
             return []
+        for obj in objects:
+            object_info = ObjectInfo(
+                id=str(uuid4()),
+                location=f"{self.obj_prefix}{obj.name}",  # Accessing blob's name
+                format=(obj.name).split(".")[-1],  # Extracting format from the name
+                file_size_kb=obj.size // 1024,
+                file_hash=obj.etag.strip('"'),
+                tags=self.fetch_tags(f"{self.obj_prefix}{obj.name}", metrics_collector)
+            )
+            print(f"INFO:{object_info}")
+            # Append each object_info inside the loop
+            objects_info.append(object_info.to_json())
+        return objects_info
 
-
+    
     def read_object(self, object_path: str, sc: SparkSession,metrics_collector:MetricsCollector, file_format: str) -> DataFrame:
         labels = [
              {"key": "request_method", "value": "GET"},
              {"key": "method_name", "value": "getObject"},
              {"key": "object_path", "value": object_path}
          ]
-
-        print("In read object", object_path)
-        
-        api_calls= 0
+        api_calls,errors,records_count= 0,0,0
         try:
              # Determine file format based on the provided parameter
              if file_format == "jsonl":
@@ -169,24 +172,30 @@ class GCS(BlobProvider):
                  df = sc.read.format("csv").option("header", True).option("compression", "gzip").load(object_path)
              else:
                raise Exception(f"Unsupported file format for file: {file_format}")
-            #  records_count = df.count()
+             records_count = df.count()
              api_calls += 1
-             metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
-             return df 
+             metrics_collector.collect({"num_api_calls": api_calls, "num_records": records_count}, addn_labels=labels)
+             return df
+        except (ClientError) as exception:
+            errors += 1
+            labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
+            metrics_collector.collect("num_errors", errors, addn_labels=labels)
+            raise Exception( f"failed to read object from S3: {str(exception)}")
         except Exception as exception:
-            metrics_collector.collect("num_errors", addn_labels=labels)
-            raise Exception(f"failed to read object from GCS: {str(exception)}")
+            errors += 1
+            labels += [{"key": "error_code", "value": "S3_READ_ERROR"}]
+            metrics_collector.collect("num_errors", errors, addn_labels=labels)
+            raise Exception( f"failed to read object from S3: {str(exception)}")
 
     
     def _list_objects(self,metrics_collector:MetricsCollector):
-        """Lists all the blobs in the bucket."""
         bucket_name = self.connector_config['bucket']
-        api_calls=0
         summaries=[]
         labels = [
             {"key": "request_method", "value": "GET"},
             {"key": "method_name", "value": "ListBlobs"}
         ]
+        api_calls,errors=0,0
         try:
             # Note: Client.list_blobs requires at least package version 1.17.0.
             objects = self.gcs_client.list_blobs(bucket_name)
@@ -195,14 +204,14 @@ class GCS(BlobProvider):
                 # print(blob.name)
                 summaries.append(obj)
         except ( ClientError) as exception:
-                # errors += 1
+                errors += 1
                 labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
-                metrics_collector.collect("num_errors", addn_labels=labels)
-                raise Exception(f"failed to list objects in GCS: {str(exception)}")
+                metrics_collector.collect("num_errors", errors, addn_labels=labels)
+                raise Exception (f"failed to list objects in GCS: {str(exception)}")
         metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
-        # print(summaries)
         return summaries
 
+    
     def _get_spark_session(self):
              return SparkSession.builder.config(conf=self.get_spark_config()).getOrCreate()
 
