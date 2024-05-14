@@ -25,6 +25,7 @@ class AzureBlobStorage(BlobProvider):
 
         self.connection_string = f"DefaultEndpointsProtocol=https;AccountName={self.account_name};AccountKey={self.account_key};BlobEndpoint={self.blob_endpoint}" 
 
+
     def get_spark_config(self, connector_config) -> SparkConf:
         conf = get_base_conf()
         conf.setAppName("ObsrvObjectStoreConnector")
@@ -34,7 +35,6 @@ class AzureBlobStorage(BlobProvider):
         return conf
 
     
-
     def fetch_objects(self,metrics_collector: MetricsCollector) -> List[ObjectInfo]:
         
         try:
@@ -66,7 +66,8 @@ class AzureBlobStorage(BlobProvider):
             print("Exception: 1",e)
             #exit()
         return objects_info
-    
+
+
     def read_object(self, object_path: str, sc: SparkSession, metrics_collector: MetricsCollector,file_format: str) -> DataFrame:
         labels = [
             {"key": "request_method", "value": "GET"},
@@ -101,7 +102,6 @@ class AzureBlobStorage(BlobProvider):
             return df
         except Exception as e:
              print(f"Failed to read data from Blob {e}")
-        
 
 
     def _list_blobs_in_container(self,metrics_collector )->List :
@@ -114,7 +114,6 @@ class AzureBlobStorage(BlobProvider):
             else:
                 raise Exception("Container does not exist")
                 
-
             blob_list = container.list_blobs()
             print(" ")
             print("Listing blobs...\n")
@@ -160,6 +159,7 @@ class AzureBlobStorage(BlobProvider):
         except Exception as ex:
             print("Exception:3", ex)
 
+
     def fetch_tags(self, object_path: str, metrics_collector: MetricsCollector) -> List[Tag]:
         obj=object_path.split("//")[-1].split("/")[-1]
         labels = [
@@ -186,7 +186,7 @@ class AzureBlobStorage(BlobProvider):
             print(f"Error retrieving tags: {e}")
         except Exception as ex:
             print("Exception:4", ex)
-        return [Tag(k,v) for k,v in tags.items()]
+        return [Tag(key,value) for key,value in tags.items()]
     
 
     def update_tag(self,object: ObjectInfo, tags: list, metrics_collector: MetricsCollector) -> bool:
@@ -199,8 +199,6 @@ class AzureBlobStorage(BlobProvider):
         new_tags = list(json.loads(t) for t in set([json.dumps(t) for t in initial_tags + tags]))
         updated_tags = [Tag(tag.get('key'), tag.get('value')).to_azure() for tag in new_tags]
         try:
-    
-
             values = list(object.values())
             obj = values[3].split('//')[-1].split('/')[-1]
             
