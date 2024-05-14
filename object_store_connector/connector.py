@@ -18,6 +18,9 @@ from provider.s3 import S3
 from models.object_info import ObjectInfo
 
 logger = LoggerController(__name__)
+
+MAX_RETRY_COUNT = 10
+
 class ObjectStoreConnector(ISourceConnector):
     def __init__(self):
         self.provider = None
@@ -28,41 +31,37 @@ class ObjectStoreConnector(ISourceConnector):
         self.running_state = ExecutionState.RUNNING.value
         self.not_running_state = ExecutionState.NOT_RUNNING.value
         self.queued_state = ExecutionState.QUEUED.value 
-        self.data_format = None
-        self.tag_update_failed = dict()
 
     def process(self, sc: SparkSession, ctx: ConnectorContext, connector_config: Dict[Any, Any], metrics_collector: MetricsCollector) -> Iterator[DataFrame]:
-        if (ctx.state.get_state("STATUS", default_value=self.not_running_state) == "running"):
+        if (ctx.state.get_state("status", default_value=self.not_running_state) == self.running_state):
             logger.info("Connector is already running. Skipping processing.")
-            return 
+            return
 
-        ctx.state.put_state("STATUS", self.running_state)
+        ctx.state.put_state("status", self.running_state)
         ctx.state.save_state()
-
-        last_run_time = datetime.datetime.now()
-        ctx.state.put_state("last_run_time", last_run_time)
-        ctx.state.save_state()
-        self.max_retries = connector_config["max_retries"] if "max_retries" in connector_config else 10
-        self.objects_to_process = ctx.state.get_state("to_process")
+        self.max_retries = connector_config["source"]["max_retries"] if "max_retries" in connector_config["source"] else MAX_RETRY_COUNT
         self._get_provider(connector_config)
         self._get_objects_to_process(ctx, metrics_collector)
-        self.data_format = ctx.data_format
         for res in self._process_objects(sc, ctx, metrics_collector):
             yield res
         
-        ctx.state.put_state("STATUS", self.not_running_state)
+        last_run_time = datetime.datetime.now()
+        ctx.state.put_state("status", self.not_running_state)
         ctx.state.put_state("last_run_time", last_run_time)
         ctx.state.save_state()
 
     def get_spark_conf(self, connector_config) -> SparkConf:
         self._get_provider(connector_config)
-        return self.provider.get_spark_config(connector_config)
+        if self.provider is not None:
+            return self.provider.get_spark_config(connector_config)
+        
+        return SparkConf()
 
     def _get_provider(self, connector_config: Dict[Any, Any]):
-        if connector_config["type"] == "s3":
+        if connector_config["source"]["type"] == "s3":    
             self.provider = S3(connector_config)
         else:
-            raise ObsrvException(ErrorData("INVALID_PROVIDER", "provider not supported: {}".format(connector_config["type"])))
+            ObsrvException(ErrorData("INVALID_PROVIDER", "provider not supported: {}".format(connector_config["source"]["type"])))
 
     def _get_objects_to_process(self, ctx: ConnectorContext, metrics_collector: MetricsCollector) -> None:
         objects = ctx.state.get_state("to_process", list())
@@ -70,39 +69,42 @@ class ObjectStoreConnector(ISourceConnector):
             self.dedupe_tag = "{}-{}".format(ctx.building_block, ctx.env)
         else:
             raise ObsrvException(ErrorData("INVALID_CONTEXT", "building_block or env not found in context"))
-        if not len(objects):
+        
+        if not len(objects):    
+            num_files_discovered = ctx.stats.get_stat('num_files_discovered', 0)
             objects = self.provider.fetch_objects(ctx, metrics_collector)
             objects = self._exclude_processed_objects(ctx, objects)
             metrics_collector.collect("new_objects_discovered", len(objects))
             ctx.state.put_state("to_process", objects)
             ctx.state.save_state()
+            num_files_discovered += len(objects)
+            ctx.stats.put_stat("num_files_discovered", num_files_discovered)  
+            ctx.stats.save_stats()
 
         self.objects = objects
-        ctx.stats.put_stat("num_files_discovered", len(self.objects))  
-        ctx.stats.save_stats()
 
     def _process_objects(self, sc: SparkSession, ctx: ConnectorContext, metrics_collector: MetricsCollector) -> Iterator[DataFrame]:
-        num_files_processed = 0
+        num_files_processed = ctx.stats.get_stat('num_files_processed', 0)
         for i in range(0, len(self.objects)):
             obj = self.objects[i]
             obj["start_processing_time"] = time.time()
             columns = StructType([])
-            df = self.provider.read_object(obj.get("location"), sc=sc, metrics_collector=metrics_collector, file_format=self.data_format)
+            df = self.provider.read_object(obj.get("location"), sc=sc, metrics_collector=metrics_collector, file_format=ctx.data_format)
 
             if df is None:
-                obj.num_of_retries += 1
-                if obj.num_of_retries < self.max_retries:
+                obj["num_of_retries"] += 1
+                if obj["num_of_retries"] < self.max_retries:
                     ctx.state.put_state("to_process", self.objects[i:])
+                    ctx.state.save_state()
                 else:
-                    res = self._update_tag(obj=obj, ctx=ctx, status=self.error_state, metrics_collector=metrics_collector)
-                    if not(res):
-                        ctx.state.put_state("tag_update_failed",self.tag_update_failed.update({obj["location"]: self.error_state}))
-                        ObsrvException(ErrorData("TAG_UPDATE_ERROR", f"failed to update tag for object in path: ", obj["location"]))
-                yield sc.createDataFrame(data=[], schema=columns)
-            else: 
+                    if not self.provider.update_tag(object=obj, tags=[{"key": self.dedupe_tag, "value": self.error_state}], metrics_collector=metrics_collector):
+                        break
+                return
+            else:
                 df = self._append_custom_meta(sc, df, obj)
                 obj["download_time"] = time.time()-obj.get("start_processing_time")
-                self._update_tag(obj=obj, ctx=ctx, status=self.success_state, metrics_collector=metrics_collector)
+                if not self.provider.update_tag(object=obj, tags=[{"key": self.dedupe_tag, "value": self.success_state}], metrics_collector=metrics_collector):
+                    break
                 ctx.state.put_state("to_process", self.objects[i+1:])
                 ctx.state.save_state()
                 num_files_processed += 1
@@ -111,13 +113,6 @@ class ObjectStoreConnector(ISourceConnector):
                 yield df
         
         ctx.stats.save_stats()
-
-    def _update_tag(self, obj: ObjectInfo, ctx: ConnectorContext, status: str, metrics_collector: MetricsCollector) -> bool:
-        res = self.provider.update_tag(object=obj, tags=[{"key": self.dedupe_tag, "value": status}], metrics_collector=metrics_collector)
-        if not(res):
-            ctx.state.put_state("tag_update_failed", self.tag_update_failed.update({obj["location"]: status}))
-            raise ObsrvException(ErrorData("TAG_UPDATE_ERROR", f"failed to update tag for object in path: ",obj["location"]))
-        return res
 
     def _append_custom_meta(self, sc: SparkSession, df: DataFrame, object: ObjectInfo) -> DataFrame:
         addn_meta = {
@@ -137,7 +132,6 @@ class ObjectStoreConnector(ISourceConnector):
         to_be_processed = []
         for obj in objects:
             if not any(tag["key"] == self.dedupe_tag for tag in obj.get("tags")):
-                if obj["location"] not in self.tag_update_failed.keys():
-                    to_be_processed.append(obj)
+                to_be_processed.append(obj)
 
         return to_be_processed

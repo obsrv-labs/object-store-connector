@@ -17,8 +17,9 @@ class S3(BlobProvider):
     def __init__(self, connector_config) -> None:
         super().__init__()
         self.connector_config = connector_config
-        self.bucket = connector_config['bucket']
-        self.prefix = connector_config.get('prefix', '/') # TODO: Implement partitioning support
+        self.bucket = connector_config['source']['bucket']
+        # self.prefix = connector_config.get('prefix', '/') # TODO: Implement partitioning support
+        self.prefix = connector_config['source']['prefix'] if 'prefix' in connector_config['source'] else '/'
         self.obj_prefix = f"s3a://{self.bucket}/"
         self.s3_client = self._get_client()
 
@@ -36,8 +37,8 @@ class S3(BlobProvider):
         conf.set("spark.hadoop.fs.s3a.endpoint", "s3.amazonaws.com")  # Set S3 endpoint
         conf.set("spark.hadoop.fs.s3a.multiobjectdelete.enable", "false")  # Disable multiobject delete
         conf.set("spark.hadoop.fs.s3a.aws.credentials.provider", "org.apache.hadoop.fs.s3a.SimpleAWSCredentialsProvider")  # Use simple AWS credentials provider
-        conf.set("spark.hadoop.fs.s3a.access.key", connector_config['credentials']['access_key'])  # AWS access key
-        conf.set("spark.hadoop.fs.s3a.secret.key", connector_config['credentials']['secret_key'])  # AWS secret key
+        conf.set("spark.hadoop.fs.s3a.access.key", connector_config['source']['credentials']['access_key'])  # AWS access key
+        conf.set("spark.hadoop.fs.s3a.secret.key", connector_config['source']['credentials']['secret_key'])  # AWS secret key
         conf.set("com.amazonaws.services.s3.enableV4", "true")  # Enable V4 signature
 
         return conf
@@ -86,7 +87,8 @@ class S3(BlobProvider):
             errors += 1
             labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
-            ObsrvException(ErrorData("S3_TAG_UPDATE_ERROR", f"failed to update tags in S3: {str(exception)}"))
+            ObsrvException(ErrorData("S3_TAG_UPDATE_ERROR", f"failed to update tags in S3 for object: {str(exception)}"))
+            return False
 
     def fetch_objects(self, ctx: ConnectorContext, metrics_collector: MetricsCollector) -> List[ObjectInfo]:
         objects = self._list_objects(ctx, metrics_collector=metrics_collector)
@@ -140,14 +142,14 @@ class S3(BlobProvider):
 
     def _get_client(self):
         session = boto3.Session(
-            aws_access_key_id=self.connector_config['credentials']['access_key'],
-            aws_secret_access_key=self.connector_config['credentials']['secret_key'],
-            region_name=self.connector_config['credentials']['region']
+            aws_access_key_id=self.connector_config['source']['credentials']['access_key'],
+            aws_secret_access_key=self.connector_config['source']['credentials']['secret_key'],
+            region_name=self.connector_config['source']['credentials']['region']
         )
         return session.client("s3")
 
     def _list_objects(self, ctx: ConnectorContext, metrics_collector) -> list:
-        bucket_name = self.connector_config['bucket']
+        bucket_name = self.connector_config['source']['bucket']
         prefix = self.prefix
         summaries = []
         continuation_token = None
