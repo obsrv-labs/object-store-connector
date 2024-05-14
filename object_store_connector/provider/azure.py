@@ -1,6 +1,6 @@
 
 from typing import Dict, List, Any
-from azure.storage.blob import ContainerClient, BlobClient, BlobServiceClient
+from azure.storage.blob import ContainerClient, BlobClient
 from pyspark.sql import DataFrame, SparkSession
 from provider.blob_provider import BlobProvider
 from models.object_info import ObjectInfo,Tag
@@ -25,12 +25,6 @@ class AzureBlobStorage(BlobProvider):
 
         self.connection_string = f"DefaultEndpointsProtocol=https;AccountName={self.account_name};AccountKey={self.account_key};BlobEndpoint={self.blob_endpoint}" 
 
-    # def _get_spark_session(self):
-    #     spark = SparkSession.builder\
-    #         .appName("ObsrvAzureBlobStoreConnector")\
-    #         .config("spark.jars.packages", "org.apache.hadoop:hadoop-azure:3.3.1") \
-    #         .getOrCreate()
-    #     return spark
     def get_spark_config(self, connector_config) -> SparkConf:
         conf = get_base_conf()
         conf.setAppName("ObsrvObjectStoreConnector")
@@ -92,6 +86,8 @@ class AzureBlobStorage(BlobProvider):
                 df = sc.read.format("json").option("compression", "gzip").option("multiLine", True).load(object_path)
             elif file_format == "csv":
                 df = sc.read.format("csv").option("header", True).load(object_path)
+            elif file_format == "parquet":
+                df = sc.read.parquet(object_path)
             elif file_format == "csv.gz":
                 df = sc.read.format("csv").option("header", True).option("compression", "gzip").load(object_path)
             else:
@@ -138,9 +134,6 @@ class AzureBlobStorage(BlobProvider):
             #exit()
             
         
-
-    
-
     def _get_spark_session(self):
         return SparkSession.builder.config(conf=self.get_spark_config()).getOrCreate()
 

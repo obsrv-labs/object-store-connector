@@ -14,7 +14,7 @@ class Tag:
             'value': self.value
         }
 
-    def to_aws(self):
+    def to_azure(self):
         return {
             'Key': self.key,
             'Value': self.value

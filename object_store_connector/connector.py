@@ -13,6 +13,7 @@ from pyspark.conf import SparkConf
 from pyspark.sql.functions import lit
 
 from provider.s3 import S3
+from provider.azure import AzureBlobStorage
 from models.object_info import ObjectInfo
 
 class ObjectStoreConnector(ISourceConnector):
@@ -38,22 +39,25 @@ class ObjectStoreConnector(ISourceConnector):
     def _get_provider(self, connector_config: Dict[Any, Any]):
         if connector_config["type"] == "s3":
             self.provider = S3(connector_config)
+        elif connector_config["type"] == "azure_blob":
+            self.provider = AzureBlobStorage(connector_config)
+            print("---",connector_config)
         else:
             raise ObsrvException(ErrorData("INVALID_PROVIDER", "provider not supported: {}".format(connector_config["type"])))
 
     def _get_objects_to_process(self, ctx: ConnectorContext, metrics_collector: MetricsCollector) -> None:
-        objects = ctx.state.get_state("to_process", list())
-        if ctx.building_block is not None and ctx.env is not None:
-            self.dedupe_tag = "{}-{}".format(ctx.building_block, ctx.env)
-        else:
-            raise ObsrvException(ErrorData("INVALID_CONTEXT", "building_block or env not found in context"))
+        # objects = ctx.state.get_state("to_process", list())
+        # if ctx.building_block is not None and ctx.env is not None:
+        #     self.dedupe_tag = "{}-{}".format(ctx.building_block, ctx.env)
+        # else:
+        #     raise ObsrvException(ErrorData("INVALID_CONTEXT", "building_block or env not found in context"))
 
-        if not len(objects):
-            objects = self.provider.fetch_objects(metrics_collector)
-            objects = self._exclude_processed_objects(objects)
-            metrics_collector.collect("new_objects_discovered", len(objects))
-            ctx.state.put_state("to_process", objects)
-            ctx.state.save_state()
+        # if not len(objects):
+        objects = self.provider.fetch_objects(metrics_collector)
+        # objects = self._exclude_processed_objects(objects)
+        # metrics_collector.collect("new_objects_discovered", len(objects))
+        # ctx.state.put_state("to_process", objects)
+        # ctx.state.save_state()
 
         self.objects = objects
 
