@@ -53,7 +53,6 @@ class GCS(BlobProvider):
             conf.set("spark.hadoop.google.cloud.auth.service.account.enable", "true") 
             conf.set("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") 
             conf.set("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
-            conf.set("spark.sql.debug.maxToStringFields", 1000) 
             return conf
 
 
