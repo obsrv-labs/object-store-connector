@@ -52,14 +52,15 @@ class GCS(BlobProvider):
             conf.set("spark.hadoop.google.cloud.auth.service.account.json.keyfile", self.key_path) 
             conf.set("spark.hadoop.google.cloud.auth.service.account.enable", "true") 
             conf.set("spark.hadoop.fs.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFileSystem") 
-            conf.set("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS") 
+            conf.set("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
+            conf.set("spark.sql.debug.maxToStringFields", 1000) 
             return conf
 
-    
+
     def fetch_tags(self, object_path: str, metrics_collector: MetricsCollector) -> List[Tag]:
         labels = [
             {"key": "request_method", "value": "GET"},
-            {"key": "method_name", "value": "getObjectTagging"},
+            {"key": "method_name", "value": "getObjectMetadata"},
             {"key": "object_path", "value": object_path}
         ]
         api_calls, errors = 0, 0
@@ -80,55 +81,40 @@ class GCS(BlobProvider):
                     tags.append({'Key': key, 'Value': value})
                 metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
                 print(f"Tags:{tags}")
-            else:
-                print(f"No metadata found for object '{object_path}'.")
-                return []
-        except Exception as e:
+        except Exception as exception:
+            errors += 1
+            labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
-            print(f"Error fetching metadata: {str(e)}")
-            return []
+            raise Exception(f"failed to fetch tags from S3: {str(exception)}")
         return tags
 
-    
+
     def update_tag(self, object: ObjectInfo, tags: List[Tag], metrics_collector: MetricsCollector) -> bool:
         object_path = object.get('location')
-        print(object_path)
         labels = [
             {"key": "request_method", "value": "PUT"},
-            {"key": "method_name", "value": "setObjectTagging"},
+            {"key": "method_name", "value": "updateObjectMetadata"},
             {"key": "object_path", "value": object_path}
         ]
-        api_calls,errors= 0,0
+        api_calls,errors=0,0
         try:
-            # Get the bucket
-            relative_path = object_path.replace("gs://" + self.bucket + "/", "")
-            bucket = self.gcs_client.bucket(self.bucket)
-            blob = bucket.get_blob(relative_path)
-            blob.reload()
-            existing_metadata = blob.metadata
-            print(f"Present:{existing_metadata}")
-            # Convert the list of Tag objects into a list of dictionaries
-            tags_dict = [{tag.key: tag.value} for tag in tags]
-            for item in tags_dict:
-                key = list(item.keys())[0]
-                value = item[key]
-                print(item)
-                if key in existing_metadata:
-                    print(f"Key '{key}' already exists in existing metadata for object '.")
-                    return False
-                existing_metadata[key] = value
-            # Update metadata for the object
-            blob.metadata = existing_metadata
-            blob.patch()
+            initial_tags = object.get('tags')
+            print(f"Initial:{initial_tags}")
+            new_tags = list(json.loads(t) for t in set([json.dumps(t) for t in initial_tags + tags]))
+            print(f"New tags:{new_tags}")
+            # Filter out tags with missing key or value
+            valid_tags = [tag for tag in new_tags if 'key' in tag and 'value' in tag]
+            updated_tags = [Tag(tag['key'], tag['value']).to_gcs() for tag in valid_tags]
+            print(f"Updated: {updated_tags}")
             metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
             return True
         except (ClientError) as exception:
-            errors+=1
+            errors += 1
             labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
-            metrics_collector.collect("num_errors",errors, addn_labels=labels)
-            print(f"Error updating metadata: {str(e)}")
-            raise Exception( f"failed to update tags in S3: {str(exception)}")
-            
+            metrics_collector.collect("num_errors", errors, addn_labels=labels)
+            print(f"Error updating metadata: {str(exception)}")
+            raise Exception(f"failed to update tags in GCS: {str(exception)}")
+
   
     def fetch_objects(self, metrics_collector: MetricsCollector) -> List[ObjectInfo]:
         objects = self._list_objects(metrics_collector=metrics_collector)
@@ -145,12 +131,10 @@ class GCS(BlobProvider):
                 file_hash=obj.etag.strip('"'),
                 tags=self.fetch_tags(f"{self.obj_prefix}{obj.name}", metrics_collector)
             )
-            print(f"INFO:{object_info}")
-            # Append each object_info inside the loop
             objects_info.append(object_info.to_json())
         return objects_info
 
-    
+
     def read_object(self, object_path: str, sc: SparkSession,metrics_collector:MetricsCollector, file_format: str) -> DataFrame:
         labels = [
              {"key": "request_method", "value": "GET"},
@@ -199,9 +183,7 @@ class GCS(BlobProvider):
         try:
             # Note: Client.list_blobs requires at least package version 1.17.0.
             objects = self.gcs_client.list_blobs(bucket_name)
-            # Note: The call returns a response only when the iterator is consumed.
             for obj in objects:
-                # print(blob.name)
                 summaries.append(obj)
         except ( ClientError) as exception:
                 errors += 1
@@ -211,7 +193,6 @@ class GCS(BlobProvider):
         metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
         return summaries
 
-    
     def _get_spark_session(self):
              return SparkSession.builder.config(conf=self.get_spark_config()).getOrCreate()
 
