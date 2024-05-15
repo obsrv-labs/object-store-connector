@@ -1,7 +1,8 @@
 from dataclasses import dataclass, field
+from datetime import datetime
 from typing import List
 from uuid import uuid4
-from datetime import datetime
+
 
 @dataclass
 class Tag:
@@ -9,10 +10,7 @@ class Tag:
     value: str
 
     def to_dict(self):
-        return {
-            'key': self.key,
-            'value': self.value
-        }
+        return {"key": self.key, "value": self.value}
 
     def to_azure(self):
         return {
@@ -20,6 +18,7 @@ class Tag:
             'Value': self.value
         }
 
+    
 @dataclass
 class ObjectInfo:
     id: str = field(default_factory=lambda: str(uuid4()))
@@ -38,17 +37,17 @@ class ObjectInfo:
 
     def to_json(self):
         return {
-            'id': self.id,
-            'connector_id': self.connector_id,
-            'dataset_id': self.dataset_id,
-            'location': self.location,
-            'format': self.format,
-            'file_size_kb': self.file_size_kb,
-            'in_time': self.in_time,
-            'download_time': self.download_time,
-            'start_processing_time': self.start_processing_time,
-            'end_processing_time': self.end_processing_time,
-            'file_hash': self.file_hash,
-            'num_of_retries': self.num_of_retries,
-            'tags': [tag.__dict__ for tag in self.tags]
+            "id": self.id,
+            "connector_id": self.connector_id,
+            "dataset_id": self.dataset_id,
+            "location": self.location,
+            "format": self.format,
+            "file_size_kb": self.file_size_kb,
+            "in_time": self.in_time,
+            "download_time": self.download_time,
+            "start_processing_time": self.start_processing_time,
+            "end_processing_time": self.end_processing_time,
+            "file_hash": self.file_hash,
+            "num_of_retries": self.num_of_retries,
+            "tags": [tag.__dict__ for tag in self.tags],
         }
