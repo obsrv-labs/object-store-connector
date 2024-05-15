@@ -71,6 +71,8 @@ class ObjectStoreConnector(ISourceConnector):
     def _get_provider(self, connector_config: Dict[Any, Any]):
         if connector_config["source"]["type"] == "s3":
             self.provider = S3(connector_config)
+        elif connector_config["type"] == "gcs":
+            self.provider = GCS(connector_config)
         else:
             ObsrvException(
                 ErrorData(
@@ -177,4 +179,5 @@ class ObjectStoreConnector(ISourceConnector):
             if not any(tag["key"] == self.dedupe_tag for tag in obj.get("tags")):
                 to_be_processed.append(obj)
 
+        # return [objects[-1]] #TODO: Remove this line
         return to_be_processed
