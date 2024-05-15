@@ -1,6 +1,6 @@
 
 from typing import Dict, List, Any
-from azure.storage.blob import ContainerClient, BlobClient
+from azure.storage.blob import ContainerClient, BlobClient, BlobServiceClient
 from pyspark.sql import DataFrame, SparkSession
 from provider.blob_provider import BlobProvider
 from models.object_info import ObjectInfo,Tag
@@ -22,8 +22,11 @@ class AzureBlobStorage(BlobProvider):
         self.account_key = self.config["credentials"]["account_key"]
         self.container_name = self.config["containername"]
         self.blob_endpoint = self.config["blob_endpoint"]
+        self.prefix = self.config["prefix"]
+        
 
         self.connection_string = f"DefaultEndpointsProtocol=https;AccountName={self.account_name};AccountKey={self.account_key};BlobEndpoint={self.blob_endpoint}" 
+        self.container_client = ContainerClient.from_connection_string(self.connection_string,self.container_name)
 
 
     def get_spark_config(self, connector_config) -> SparkConf:
@@ -105,10 +108,41 @@ class AzureBlobStorage(BlobProvider):
 
 
     def _list_blobs_in_container(self,metrics_collector )->List :
+        # container_name = self.config['container_name']
+        # prefix = self.prefix
+        # summaries = []
+        # marker = None
+
+        # # metrics
+        # api_calls, errors = 0, 0
+
+        # labels = [
+        #     {"key": "request_method", "value": "GET"},
+        #     {"key": "method_name", "value": "list_blobs"}
+        # ]
+
+        # while True:
+        #     try:
+        #         self.container_client.list_blobs
+        #         blobs = self.container_client.list_blobs(container_name, name_starts_with=prefix, marker=marker)
+        #         api_calls += 1
+        #         summaries.extend(blobs)
+        #         if not blobs.next_marker:
+        #             break
+        #         marker = blobs.next_marker
+        #     except Exception as exception:
+        #         errors += 1
+        #         labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
+        #         metrics_collector.collect("num_errors", errors, addn_labels=labels)
+        #         raise ObsrvException(ErrorData('AZURE_BLOB_LIST_ERROR', f"Failed to list objects in Azure Blob Storage: {str(exception)}"))
+
+        # return summaries
+        
         try:
             container = ContainerClient.from_connection_string(
                 conn_str=self.connection_string, container_name=self.container_name
             )
+            
             if container.exists():
                 print("Container exists")
             else:
@@ -131,6 +165,7 @@ class AzureBlobStorage(BlobProvider):
         except Exception as ex:
             print("Exception: 2", ex)
             #exit()
+        
             
         
     def _get_spark_session(self):
@@ -161,7 +196,7 @@ class AzureBlobStorage(BlobProvider):
 
 
     def fetch_tags(self, object_path: str, metrics_collector: MetricsCollector) -> List[Tag]:
-        obj=object_path.split("//")[-1].split("/")[-1]
+        obj=object_path.split("//")[-1].split("/")[-1] #
         labels = [
             {"key": "request_method", "value": "GET"},
             {"key": "method_name", "value": "getObjectTagging"},
@@ -176,17 +211,22 @@ class AzureBlobStorage(BlobProvider):
             )
             tags = blob_client.get_blob_tags()
             print("Blob tags:")
-            
+            api_calls += 1
+            metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
             for k, v in tags.items():
                 print(k, v)
             print("\n")  
-            #return tag_objects
+            return [Tag(key,value) for key,value in tags.items()]
             
-        except (ValueError, IOError) as e:
-            print(f"Error retrieving tags: {e}")
-        except Exception as ex:
-            print("Exception:4", ex)
-        return [Tag(key,value) for key,value in tags.items()]
+        # except (ValueError, IOError) as e:
+        #     print(f"Error retrieving tags: {e}")
+        except Exception as exception:
+            errors += 1
+            labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
+            metrics_collector.collect("num_errors", errors, addn_labels=labels)
+            raise ObsrvException(ErrorData("AZURE_TAG_READ_ERROR", f"failed to fetch tags from AZURE: {str(exception)}"))
+            #print("Exception:4", exception)
+        
     
 
     def update_tag(self,object: ObjectInfo, tags: list, metrics_collector: MetricsCollector) -> bool:
@@ -195,7 +235,10 @@ class AzureBlobStorage(BlobProvider):
             {"key": "method_name", "value": "setObjectTagging"},
             {"key": "object_path", "value": object.get('location')}
         ]
+        api_calls, errors = 0, 0
+
         initial_tags = object.get('tags')
+        print("::initials tags::\n",initial_tags)
         new_tags = list(json.loads(t) for t in set([json.dumps(t) for t in initial_tags + tags]))
         updated_tags = [Tag(tag.get('key'), tag.get('value')).to_azure() for tag in new_tags]
         try:
@@ -210,10 +253,17 @@ class AzureBlobStorage(BlobProvider):
             existing_tags.update(tags)
             blob_client.set_blob_tags(existing_tags)
             print("Blob tags updated!")
+            metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
+            return True
         except (ValueError, IOError) as e:
             print(f"Error setting tags: {e}")
-        except Exception as ex:
-            print("Exception:5", ex)
+        except Exception as exception:
+            errors += 1
+            labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
+            metrics_collector.collect("num_errors", errors, addn_labels=labels)
+            raise ObsrvException(ErrorData("AZURE_TAG_UPDATE_ERROR", f"failed to update tags in AZURE: {str(exception)}"))
+
+            #print("Exception:5", ex)
         
         print("updated tags",updated_tags)
 
