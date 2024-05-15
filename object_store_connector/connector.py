@@ -38,6 +38,8 @@ class ObjectStoreConnector(ISourceConnector):
     def _get_provider(self, connector_config: Dict[Any, Any]):
         if connector_config["type"] == "s3":
             self.provider = S3(connector_config)
+        elif connector_config["type"] == "gcs":
+            self.provider = GCS(connector_config)
         else:
             raise ObsrvException(ErrorData("INVALID_PROVIDER", "provider not supported: {}".format(connector_config["type"])))
 
