@@ -6,7 +6,7 @@ from provider.blob_provider import BlobProvider
 from models.object_info import ObjectInfo,Tag
 from pyspark.conf import SparkConf
 from obsrv.job.batch import get_base_conf
-from obsrv.connector import MetricsCollector
+from obsrv.connector import ConnectorContext, MetricsCollector
 from obsrv.common import ObsrvException
 from obsrv.models import ErrorData
 import json
@@ -18,11 +18,11 @@ class AzureBlobStorage(BlobProvider):
     def __init__(self, connector_config: str)-> None:
         super().__init__()
         self.config=connector_config
-        self.account_name = self.config["credentials"]["account_name"]
-        self.account_key = self.config["credentials"]["account_key"]
-        self.container_name = self.config["containername"]
-        self.blob_endpoint = self.config["blob_endpoint"]
-        self.prefix = self.config["prefix"]
+        self.account_name = self.config["source"]["credentials"]["account_name"]
+        self.account_key = self.config["source"]["credentials"]["account_key"]
+        self.container_name = self.config["source"]["containername"]
+        self.blob_endpoint = self.config["source"]["blob_endpoint"]
+        self.prefix = self.config["source"]["prefix"]
         
 
         self.connection_string = f"DefaultEndpointsProtocol=https;AccountName={self.account_name};AccountKey={self.account_key};BlobEndpoint={self.blob_endpoint}" 
@@ -34,11 +34,11 @@ class AzureBlobStorage(BlobProvider):
         conf.setAppName("ObsrvObjectStoreConnector")
         conf.set("spark.jars.packages", "org.apache.hadoop:hadoop-azure:3.3.1")
         conf.set("fs.azure.storage.accountAuthType", "SharedKey")
-        conf.set("fs.azure.storage.accountKey", connector_config["credentials"]["account_key"])
+        conf.set("fs.azure.storage.accountKey", connector_config["source"]["credentials"]["account_key"])
         return conf
 
     
-    def fetch_objects(self,metrics_collector: MetricsCollector) -> List[ObjectInfo]:
+    def fetch_objects(self,ctx: ConnectorContext, metrics_collector: MetricsCollector) -> List[ObjectInfo]:
         
         try:
             objects = self._list_blobs_in_container(metrics_collector=metrics_collector)

@@ -74,7 +74,7 @@ class ObjectStoreConnector(ISourceConnector):
     def _get_provider(self, connector_config: Dict[Any, Any]):
         if connector_config["source"]["type"] == "s3":
             self.provider = S3(connector_config)
-        elif connector_config["type"] == "azure_blob":
+        elif connector_config["source"]["type"] == "azure_blob":
             self.provider = AzureBlobStorage(connector_config)
             print("Connector_config",connector_config)
         else:
