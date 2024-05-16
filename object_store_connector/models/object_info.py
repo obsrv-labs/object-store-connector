@@ -10,14 +10,23 @@ class Tag:
     value: str
 
     def to_dict(self):
-        return {"key": self.key, "value": self.value}
+        return {
+            'key': self.key,
+            'value': self.value
+        }
 
     def to_aws(self):
         return {
             'Key': self.key,
             'Value': self.value
         }
-    def to_aws(self):
+    def to_gcs(self):
+        return {
+            'Key': self.key,
+            'Value': self.value
+        }
+
+    def to_gcs(self):
         return {
             'Key': self.key,
             'Value': self.value

@@ -13,6 +13,7 @@ from provider.s3 import S3
 from pyspark.conf import SparkConf
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import lit
+from provider.gcs import GCS
 
 logger = LoggerController(__name__)
 
@@ -71,7 +72,7 @@ class ObjectStoreConnector(ISourceConnector):
     def _get_provider(self, connector_config: Dict[Any, Any]):
         if connector_config["source"]["type"] == "s3":
             self.provider = S3(connector_config)
-        elif connector_config["type"] == "gcs":
+        elif connector_config["source"]["type"] == "gcs":
             self.provider = GCS(connector_config)
         else:
             ObsrvException(
