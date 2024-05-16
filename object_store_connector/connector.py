@@ -40,12 +40,12 @@ class ObjectStoreConnector(ISourceConnector):
         connector_config: Dict[Any, Any],
         metrics_collector: MetricsCollector,
     ) -> Iterator[DataFrame]:
-        if (
-            ctx.state.get_state("status", default_value=self.not_running_state)
-            == self.running_state
-        ):
-            logger.info("Connector is already running. Skipping processing.")
-            return
+        # if (
+        #     ctx.state.get_state("status", default_value=self.not_running_state)
+        #     == self.running_state
+        # ):
+        #     logger.info("Connector is already running. Skipping processing.")
+        #     return
 
         ctx.state.put_state("status", self.running_state)
         ctx.state.save_state()
@@ -99,7 +99,6 @@ class ObjectStoreConnector(ISourceConnector):
                     "INVALID_CONTEXT", "building_block or env not found in context"
                 )
             )
-
         if not len(objects):
             num_files_discovered = ctx.stats.get_stat("num_files_discovered", 0)
             objects = self.provider.fetch_objects(ctx, metrics_collector)
