@@ -137,7 +137,7 @@ class AzureBlobStorage(BlobProvider):
         while True:
             try:      
                 if continuation_token:             
-                    blobs = self.container_client.list_blobs(results_per_page=1).by_page(continuation_token=continuation_token)
+                    blobs = self.container_client.list_blobs(results_per_page=1000).by_page(continuation_token=continuation_token)
                 else:
                     blobs= self.container_client.list_blobs()
                 api_calls += 1
