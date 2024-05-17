@@ -21,7 +21,6 @@ class GCS(BlobProvider):
             self.connector_config=connector_config
             self.bucket = connector_config['source']['bucket']
             self.credentials = connector_config['source']['credentials']
-            # self.prefix = connector_config.get('prefix', '/')
             self.prefix = (
             connector_config["source"]["prefix"]
             if "prefix" in connector_config["source"]
@@ -60,7 +59,6 @@ class GCS(BlobProvider):
             conf.set("spark.hadoop.fs.AbstractFileSystem.gs.impl", "com.google.cloud.hadoop.fs.gcs.GoogleHadoopFS")
             return conf
 
-
     def fetch_tags(self, object_path: str, metrics_collector: MetricsCollector) -> List[Tag]:
         labels = [
             {"key": "request_method", "value": "GET"},
@@ -90,7 +88,6 @@ class GCS(BlobProvider):
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
             raise Exception(f"failed to fetch tags from GCS: {str(exception)}")
     
-
     def update_tag(self, object: ObjectInfo, tags: list, metrics_collector: MetricsCollector) -> bool:
         object_path = object.get('location')
         labels = [
@@ -104,7 +101,6 @@ class GCS(BlobProvider):
             new_tags = list(json.loads(t) for t in set([json.dumps(t) for t in initial_tags + tags]))
             updated_tags = [tag for tag in new_tags if 'key' in tag and 'value' in tag]
             relative_path=object_path.lstrip("gs://").split("/",1)[-1]
-            print(f"PATH:{relative_path}")
             bucket = self.gcs_client.bucket(self.bucket)
             blob = bucket.blob(relative_path)
             if blob is None:
@@ -145,7 +141,6 @@ class GCS(BlobProvider):
         print("Object_Info:", objects_info)
         return objects_info
 
-
     def read_object(self, object_path: str, sc: SparkSession,metrics_collector:MetricsCollector, file_format: str) -> DataFrame:
         labels = [
              {"key": "request_method", "value": "GET"},
@@ -175,11 +170,6 @@ class GCS(BlobProvider):
             labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
             raise Exception( f"failed to read object from GCS: {str(exception)}")
-        except Exception as exception:
-            errors += 1
-            labels += [{"key": "error_code", "value": "GCS_READ_ERROR"}]
-            metrics_collector.collect("num_errors", errors, addn_labels=labels)
-            raise Exception( f"failed to read object from GCS: {str(exception)}")
 
     def _list_objects(self, ctx: ConnectorContext, metrics_collector: MetricsCollector) -> list:
         bucket_name = self.connector_config['source']['bucket']
@@ -196,21 +186,21 @@ class GCS(BlobProvider):
         ]
         api_calls, errors = 0, 0
         page_token = None
-        page_size = 1000# Set your desired page size here
+        page_size = 1 
         while True:
             try:
-                    bucket = self.gcs_client.bucket(bucket_name)
-                    if page_token:
-                        blobs_response = bucket.list_blobs(prefix=self.prefix, page_token=page_token, max_results=page_size)
-                    else:
-                        blobs_response = bucket.list_blobs(prefix=self.prefix, max_results=page_size)
-                    api_calls += 1
-                    for blob in blobs_response:
-                        if any(blob.name.endswith(f) for f in file_formats[file_format]):
-                            summaries.append(blob)
-                    if not blobs_response.next_page_token:
-                        break
-                    page_token = blobs_response.next_page_token
+                bucket = self.gcs_client.bucket(bucket_name)
+                if page_token:
+                    blobs_response = bucket.list_blobs(prefix=self.prefix, page_token=page_token, max_results=page_size)
+                else:
+                    blobs_response = bucket.list_blobs(prefix=self.prefix, max_results=page_size)
+                api_calls += 1
+                for blob in blobs_response:
+                    if any(blob.name.endswith(f) for f in file_formats[file_format]):
+                        summaries.append(blob)
+                if not blobs_response.next_page_token:
+                    break
+                page_token = blobs_response.next_page_token
             except ClientError as exception:
                 errors += 1
                 labels.append({"key": "error_code", "value": str(exception.response['Error']['Code'])})
@@ -221,3 +211,4 @@ class GCS(BlobProvider):
 
     def _get_spark_session(self):
              return SparkSession.builder.config(conf=self.get_spark_config()).getOrCreate()
+    
