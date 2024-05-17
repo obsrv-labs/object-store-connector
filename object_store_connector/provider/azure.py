@@ -115,7 +115,7 @@ class AzureBlobStorage(BlobProvider):
 
 
     def _list_blobs_in_container(self,ctx: ConnectorContext, metrics_collector) -> list:
-        container_name = self.config['source']['containername']
+        self.container_name = self.config['source']['containername']
         
         summaries = []
         continuation_token = None
@@ -133,13 +133,13 @@ class AzureBlobStorage(BlobProvider):
             {"key": "method_name", "value": "list_blobs"},
         ]
         
-        container_client = ContainerClient.from_connection_string(conn_str=self.connection_string, container_name=container_name)
+        # container_client = ContainerClient.from_connection_string(conn_str=self.connection_string, container_name=container_name)
         while True:
             try:      
                 if continuation_token:             
-                    blobs = container_client.list_blobs(results_per_page=1).by_page(continuation_token=continuation_token)
+                    blobs = self.container_client.list_blobs(results_per_page=1).by_page(continuation_token=continuation_token)
                 else:
-                    blobs= container_client.list_blobs()
+                    blobs= self.container_client.list_blobs()
                 api_calls += 1
                 
                 for blob in blobs:
