@@ -93,7 +93,7 @@ class AzureBlobStorage(BlobProvider):
         except AzureError as exception:
             errors += 1
             labels += [
-                {"key": "error_code", "value": str(exception.message["Error"]["Code"])}
+                {"key": "error_code", "value": str(exception.exc_msg)}
             ]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
             ObsrvException(
@@ -143,7 +143,7 @@ class AzureBlobStorage(BlobProvider):
                 api_calls += 1
                 
                 for blob in blobs:
-                    # if any(obj["Key"].endswith(f) for f in file_formats[file_format]):
+                    # if any(obj["name"].endswith(f) for f in file_formats[file_format]):
                     summaries.append(blob)
                 
                 if not continuation_token:
@@ -154,7 +154,7 @@ class AzureBlobStorage(BlobProvider):
                 labels += [
                     {
                         "key": "error_code",
-                        "value": str(exception.message["Error"]["Code"]),
+                        "value": str(exception.exc_msg),
                     }
                 ]
                 metrics_collector.collect("num_errors", errors, addn_labels=labels)
@@ -199,7 +199,7 @@ class AzureBlobStorage(BlobProvider):
         except AzureError as exception:
             errors += 1
             labels += [
-                {"key": "error_code", "value": str(exception.message["Error"]["Code"])}
+                {"key": "error_code", "value": str(exception.exc_msg)}
             ]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
             ObsrvException(
@@ -210,8 +210,6 @@ class AzureBlobStorage(BlobProvider):
             )
 
         
-    
-
     def update_tag(self,object: ObjectInfo, tags: list, metrics_collector: MetricsCollector) -> bool:
         labels = [
             {"key": "request_method", "value": "PUT"},
@@ -220,31 +218,36 @@ class AzureBlobStorage(BlobProvider):
         ]
         api_calls, errors = 0, 0
 
-        initial_tags = object.get('tags')
-        new_tags = list(json.loads(t) for t in set([json.dumps(t) for t in initial_tags + tags]))
-        updated_tags = [Tag(tag.get('key'), tag.get('value')).to_azure() for tag in new_tags]
         try:
-            values = list(object.values())
-            obj = values[3].split('//')[-1].split('/')[-1]
-            
+            print("tags parameter\n",tags)
+            new_dict = {tag['key']: tag['value'] for tag in tags}
+        
+            stripped_file_path = object.get("location").lstrip("wasb://")
+            obj = stripped_file_path.split("/")[-1]
+ 
             blob_client = BlobClient.from_connection_string(
                 conn_str=self.connection_string, container_name=self.container_name, blob_name=obj
             )
             existing_tags = blob_client.get_blob_tags() or {}
-            existing_tags.update(tags)
+            existing_tags.update(new_dict)
+            print("existing tags",existing_tags)
             blob_client.set_blob_tags(existing_tags)
             print("Blob tags updated!")
             metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
-            print("updated tags",updated_tags)
+            print("updated tags",existing_tags)
             return True
-        except (ValueError, IOError) as e:
-            print(f"Error setting tags: {e}")
         except AzureError as exception:
             errors += 1
-            labels += [{"key": "error_code", "value": str(exception.message['Error']['Code'])}]
+            labels += [
+                {"key": "error_code", "value": str(exception.exc_msg)}
+            ]
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
-            raise ObsrvException(ErrorData("AZURE_TAG_UPDATE_ERROR", f"failed to update tags in AZURE: {str(exception)}"))
-
-        
+            ObsrvException(
+                ErrorData(
+                    "AzureBlobStorage_TAG_UPDATE_ERROR",
+                    f"failed to update tags in AzureBlobStorage for object: {str(exception)}",
+                )
+            )
+            return False
         
 
