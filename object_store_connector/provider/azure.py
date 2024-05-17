@@ -41,14 +41,14 @@ class AzureBlobStorage(BlobProvider):
     def fetch_objects(self,ctx: ConnectorContext, metrics_collector: MetricsCollector) -> List[ObjectInfo]:
         
         objects = self._list_blobs_in_container(ctx,metrics_collector=metrics_collector)
-        print("objects:",objects)
+        
         objects_info=[]
         if objects==None:
             raise Exception("No objects found")
     
         for obj in objects:
             blob_location = f"wasb://{self.container_name}@storageemulator/{obj['name']}"
-            print("blob location:",blob_location)
+            
             object_info = ObjectInfo(
                     location=blob_location,
                     format=obj["name"].split(".")[-1],
@@ -116,10 +116,10 @@ class AzureBlobStorage(BlobProvider):
 
     def _list_blobs_in_container(self,ctx: ConnectorContext, metrics_collector) -> list:
         container_name = self.config['source']['containername']
-        print("container_name\n",container_name)
+        
         summaries = []
         continuation_token = None
-        formats = {
+        file_formats = {
             "json": ["json", "json.gz", "json.zip"],
             "jsonl": ["json", "json.gz", "json.zip"],
             "csv": ["csv", "csv.gz", "csv.zip"],
@@ -132,7 +132,7 @@ class AzureBlobStorage(BlobProvider):
             {"key": "request_method", "value": "GET"},
             {"key": "method_name", "value": "list_blobs"},
         ]
-        print("--------------=====================")
+        
         container_client = ContainerClient.from_connection_string(conn_str=self.connection_string, container_name=container_name)
         while True:
             try:      
@@ -143,8 +143,8 @@ class AzureBlobStorage(BlobProvider):
                 api_calls += 1
                 
                 for blob in blobs:
-                    # if any(obj["name"].endswith(f) for f in file_formats[file_format]):
-                    summaries.append(blob)
+                    if any(blob["name"].endswith(f) for f in file_formats[file_format]):
+                        summaries.append(blob)
                 
                 if not continuation_token:
                     break
@@ -187,12 +187,12 @@ class AzureBlobStorage(BlobProvider):
                 conn_str=self.connection_string, container_name=self.container_name, blob_name=object_path
             )
             tags = blob_client.get_blob_tags()
-            print("Blob tags:")
+            
             api_calls += 1
             metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
             for k, v in tags.items():
                 print(k, v)
-            print("\n")  
+            
             return [Tag(key,value) for key,value in tags.items()]
 
         #Need to check on the exception.message    
@@ -219,7 +219,7 @@ class AzureBlobStorage(BlobProvider):
         api_calls, errors = 0, 0
 
         try:
-            print("tags parameter\n",tags)
+            
             new_dict = {tag['key']: tag['value'] for tag in tags}
         
             stripped_file_path = object.get("location").lstrip("wasb://")
@@ -230,11 +230,11 @@ class AzureBlobStorage(BlobProvider):
             )
             existing_tags = blob_client.get_blob_tags() or {}
             existing_tags.update(new_dict)
-            print("existing tags",existing_tags)
+            
             blob_client.set_blob_tags(existing_tags)
-            print("Blob tags updated!")
+            
             metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
-            print("updated tags",existing_tags)
+            
             return True
         except AzureError as exception:
             errors += 1

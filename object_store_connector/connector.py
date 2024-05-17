@@ -76,7 +76,7 @@ class ObjectStoreConnector(ISourceConnector):
             self.provider = S3(connector_config)
         elif connector_config["source"]["type"] == "azure_blob":
             self.provider = AzureBlobStorage(connector_config)
-            print("Connector_config",connector_config)
+            
         else:
             ObsrvException(
                 ErrorData(
