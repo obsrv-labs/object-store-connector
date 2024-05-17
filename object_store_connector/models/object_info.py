@@ -26,12 +26,6 @@ class Tag:
             'Value': self.value
         }
 
-    def to_gcs(self):
-        return {
-            'Key': self.key,
-            'Value': self.value
-        }
-
 @dataclass
 class ObjectInfo:
     id: str = field(default_factory=lambda: str(uuid4()))
