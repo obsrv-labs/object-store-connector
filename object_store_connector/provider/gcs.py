@@ -135,15 +135,16 @@ class GCS(BlobProvider):
         for obj in objects:
             object_info = ObjectInfo(
                 id=str(uuid4()),
-                location=f"{self.obj_prefix}{obj.name}", 
-                format=(obj.name).split(".")[-1],  
-                file_size_kb=obj.size // 1024,
+                location=f"gs://{self.bucket}/{obj.name}",
+                format=obj.name.split(".")[-1],
+                file_size_kb=obj.size / 1024,
                 file_hash=obj.etag.strip('"'),
-                tags=self.fetch_tags(obj.name,metrics_collector)
+                tags=self.fetch_tags(obj.name, metrics_collector)
             )
             objects_info.append(object_info.to_json())
-        print(f"Object_Info:{objects_info}")
+        print("Object_Info:", objects_info)
         return objects_info
+
 
     def read_object(self, object_path: str, sc: SparkSession,metrics_collector:MetricsCollector, file_format: str) -> DataFrame:
         labels = [
@@ -180,12 +181,12 @@ class GCS(BlobProvider):
             metrics_collector.collect("num_errors", errors, addn_labels=labels)
             raise Exception( f"failed to read object from GCS: {str(exception)}")
 
-    def _list_objects(self,ctx: ConnectorContext,metrics_collector:MetricsCollector):
+    def _list_objects(self, ctx: ConnectorContext, metrics_collector: MetricsCollector) -> list:
         bucket_name = self.connector_config['source']['bucket']
-        summaries=[]
+        summaries = []
         file_formats = {
             "json": ["json", "json.gz", "json.zip"],
-            "jsonl": ["json", "json.gz", "json.zip"],
+            "jsonl": ["jsonl", "jsonl.gz", "jsonl.zip"],
             "csv": ["csv", "csv.gz", "csv.zip"],
         }
         file_format = ctx.data_format
@@ -193,17 +194,28 @@ class GCS(BlobProvider):
             {"key": "request_method", "value": "GET"},
             {"key": "method_name", "value": "ListBlobs"}
         ]
-        api_calls,errors=0,0
-        try:
-            objects = self.gcs_client.list_blobs(bucket_name)
-            for obj in objects:
-                if any(obj.name.endswith(f) for f in file_formats[file_format]):
-                    summaries.append(obj)
-        except ClientError as exception:
+        api_calls, errors = 0, 0
+        page_token = None
+        page_size = 1000# Set your desired page size here
+        while True:
+            try:
+                    bucket = self.gcs_client.bucket(bucket_name)
+                    if page_token:
+                        blobs_response = bucket.list_blobs(prefix=self.prefix, page_token=page_token, max_results=page_size)
+                    else:
+                        blobs_response = bucket.list_blobs(prefix=self.prefix, max_results=page_size)
+                    api_calls += 1
+                    for blob in blobs_response:
+                        if any(blob.name.endswith(f) for f in file_formats[file_format]):
+                            summaries.append(blob)
+                    if not blobs_response.next_page_token:
+                        break
+                    page_token = blobs_response.next_page_token
+            except ClientError as exception:
                 errors += 1
-                labels += [{"key": "error_code", "value": str(exception.response['Error']['Code'])}]
+                labels.append({"key": "error_code", "value": str(exception.response['Error']['Code'])})
                 metrics_collector.collect("num_errors", errors, addn_labels=labels)
-                raise Exception (f"failed to list objects in GCS: {str(exception)}")
+                Exception(f"failed to list objects in GCS: {str(exception)}")
         metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
         return summaries
 
