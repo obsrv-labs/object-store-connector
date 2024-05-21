@@ -10,12 +10,16 @@ class Tag:
     value: str
 
     def to_dict(self):
-        return {"key": self.key, "value": self.value}
-
+        return {
+            "key": self.key, 
+            "value": self.value}
+    
     def to_aws(self):
-        return {"Key": self.key, "Value": self.value}
-
-
+        return {
+            "Key": self.key, 
+            "Value": self.value}
+    
+    
 @dataclass
 class ObjectInfo:
     id: str = field(default_factory=lambda: str(uuid4()))
