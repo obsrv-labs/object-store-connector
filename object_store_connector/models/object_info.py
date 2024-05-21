@@ -10,14 +10,15 @@ class Tag:
     value: str
 
     def to_dict(self):
-        return {"key": self.key, "value": self.value}
-
-    def to_azure(self):
         return {
-            'Key': self.key,
-            'Value': self.value
-        }
-
+            "key": self.key, 
+            "value": self.value}
+    
+    def to_aws(self):
+        return {
+            "Key": self.key, 
+            "Value": self.value}
+    
     
 @dataclass
 class ObjectInfo:

@@ -1,6 +1,6 @@
 from azure.core.exceptions import AzureError
 from typing import Dict, List, Any
-from azure.storage.blob import ContainerClient, BlobClient, BlobServiceClient
+from azure.storage.blob import ContainerClient, BlobClient
 from pyspark.sql import DataFrame, SparkSession
 from provider.blob_provider import BlobProvider
 from models.object_info import ObjectInfo,Tag
@@ -9,7 +9,7 @@ from obsrv.job.batch import get_base_conf
 from obsrv.connector import ConnectorContext, MetricsCollector
 from obsrv.common import ObsrvException
 from obsrv.models import ErrorData
-import json
+
 
 
 
@@ -67,7 +67,7 @@ class AzureBlobStorage(BlobProvider):
             {"key": "object_path", "value": object_path}
         ]
         
-        # file_format = self.connector_config.get("fileFormat", {}).get("type", "jsonl")
+        
         api_calls, errors, records_count = 0, 0, 0
 
         try:
@@ -75,14 +75,11 @@ class AzureBlobStorage(BlobProvider):
                 df = sc.read.format("json").load(object_path)
             elif file_format == "json":
                 df = sc.read.format("json").option("multiLine", False).load(object_path)
-            elif file_format == "json.gz":
-                df = sc.read.format("json").option("compression", "gzip").option("multiLine", True).load(object_path)
             elif file_format == "csv":
                 df = sc.read.format("csv").option("header", True).load(object_path)
             elif file_format == "parquet":
                 df = sc.read.parquet(object_path)
-            elif file_format == "csv.gz":
-                df = sc.read.format("csv").option("header", True).option("compression", "gzip").load(object_path)
+            
             else:
                 raise ObsrvException(ErrorData("UNSUPPORTED_FILE_FORMAT", f"unsupported file format: {file_format}"))
             records_count = df.count()
@@ -195,7 +192,7 @@ class AzureBlobStorage(BlobProvider):
             
             return [Tag(key,value) for key,value in tags.items()]
 
-        #Need to check on the exception.message    
+          
         except AzureError as exception:
             errors += 1
             labels += [
