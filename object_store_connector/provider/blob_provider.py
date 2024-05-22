@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, List
 
-from models.object_info import ObjectInfo, Tag
+from object_store_connector.models.object_info import ObjectInfo, Tag
 from obsrv.connector import MetricsCollector
 from pyspark.sql import DataFrame, SparkSession
 
