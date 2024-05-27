@@ -10,11 +10,10 @@ from azure.storage.blob import *
 
 def init_azurite():
     ## Init azurite
-    azurite= AzuriteContainer("mcr.microsoft.com/azure-storage/azurite:latest").with_bind_ports(10000, 10000)
+    azurite= AzuriteContainer("mcr.microsoft.com/azure-storage/azurite:latest")
     azurite.start()
 
     blob_port= azurite.get_exposed_port(10000)
-    # blob_port=10000
     conn_str=azurite.get_connection_string()
     acc_name=azurite.account_name
     acc_key=azurite.account_key
