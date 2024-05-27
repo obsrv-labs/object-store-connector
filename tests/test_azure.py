@@ -46,38 +46,21 @@ class TestBatchConnector(unittest.TestCase):
 
         connector = ObjectStoreConnector()
         config_file_path = os.path.join(os.path.dirname(__file__), "config/config.yaml")
-        # SourceConnector.process(connector=connector, config_file_path=config_file_path)
-         ## import the objectstorreconnector class
-
-        ## update the config file with your instances
-
-        ## call SourceConnector.process* - get the logic from __main__py.
-
-        # connector = TestSource()
-        # config_file_path = os.path.join(os.path.dirname(__file__), "config/config.yaml")
 
         config = yaml.safe_load(open(config_file_path))
-
-        # config['connector_instance_id'] = "azure.new-york-taxi-data.1"
-
-        # with open(
-        #     config_file_path, "w"
-        # ) as config_file:
-        #     yaml.dump(config, config_file)
 
 
         self.assertEqual(os.path.exists(config_file_path), True)
 
         test_raw_topic = "azure.ingest"
         test_metrics_topic = "azure.metrics"
-        # import time
-        # time.sleep(100)
+        
         kafka_consumer = KafkaConsumer(
             bootstrap_servers=config["kafka"]["broker-servers"],
             group_id="azure-test-group",
             enable_auto_commit=True,
         )
-        # time.sleep(100)
+        
         trt_consumer = TopicPartition(test_raw_topic, 0)
         tmt_consumer = TopicPartition(test_metrics_topic, 0)
 
@@ -89,8 +72,7 @@ class TestBatchConnector(unittest.TestCase):
 
         print("Done processing....0")
 
-        # import time
-        # time.sleep(30)
+        
         all_messages = kafka_consumer.poll(timeout_ms=10000)
 
         metrics = []
@@ -103,6 +85,6 @@ class TestBatchConnector(unittest.TestCase):
         print(f"Number of messages in {test_metrics_topic}: {len(metrics)}")
         for message in metrics:
             print(message)
-        print("kkk",kafka_consumer.end_offsets([trt_consumer]))
+        
         assert kafka_consumer.end_offsets([trt_consumer]) == {trt_consumer: 200}
         assert kafka_consumer.end_offsets([tmt_consumer]) == {tmt_consumer: 1}
