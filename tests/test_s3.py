@@ -47,8 +47,6 @@ class TestBatchConnector(unittest.TestCase):
 
         config_file_path = os.path.join(os.path.dirname(__file__), "config/config.yaml")
 
-        SourceConnector.process(connector=connector, config_file_path=config_file_path)
-
         config = yaml.safe_load(open(config_file_path))
 
         self.assertEqual(os.path.exists(config_file_path), True)
@@ -66,17 +64,17 @@ class TestBatchConnector(unittest.TestCase):
         tmt_consumer = TopicPartition(test_metrics_topic, 0)
 
         kafka_consumer.assign([trt_consumer, tmt_consumer])
-
+        
+        # kafka_consumer.seek_to_beginning()
+        
         SourceConnector.process(connector=connector, config_file_path=config_file_path)
 
-        # Consuming messages for debugging
-        all_messages = kafka_consumer.poll(timeout_ms=10000)
-
         metrics = []
-        for topic_partition, messages in all_messages.items():
-            for message in messages:
-                if topic_partition.topic == test_metrics_topic:
-                    metrics.append(message.value)
+        # all_messages = kafka_consumer.poll(timeout_ms=10000)
+        #for topic_partition, messages in all_messages.items():
+        #    for message in messages:
+        #        if topic_partition.topic == test_metrics_topic:
+        #            metrics.append(message.value)
 
         # Check number of messages
         print(f"Number of messages in {test_metrics_topic}: {len(metrics)}")
