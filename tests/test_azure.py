@@ -70,21 +70,14 @@ class TestBatchConnector(unittest.TestCase):
 
         SourceConnector.process(connector=connector, config_file_path=config_file_path)
 
-        print("Done processing....0")
-
         
-        all_messages = kafka_consumer.poll(timeout_ms=10000)
+        # all_messages = kafka_consumer.poll(timeout_ms=10000)
 
-        metrics = []
+        # metrics = []
         # for topic_partition, messages in all_messages.items():
         #     for message in messages:
         #         if topic_partition.topic == test_metrics_topic:
         #             metrics.append(message.value)
-
-        # Check number of messages
-        print(f"Number of messages in {test_metrics_topic}: {len(metrics)}")
-        for message in metrics:
-            print(message)
         
         assert kafka_consumer.end_offsets([trt_consumer]) == {trt_consumer: 200}
         assert kafka_consumer.end_offsets([tmt_consumer]) == {tmt_consumer: 1}
