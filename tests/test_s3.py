@@ -56,7 +56,7 @@ class TestBatchConnector(unittest.TestCase):
 
         kafka_consumer = KafkaConsumer(
             bootstrap_servers=config["kafka"]["broker-servers"],
-            group_id="test-group",
+            group_id="s3-group",
             enable_auto_commit=True,
         )
 
@@ -75,11 +75,6 @@ class TestBatchConnector(unittest.TestCase):
         #    for message in messages:
         #        if topic_partition.topic == test_metrics_topic:
         #            metrics.append(message.value)
-
-        # Check number of messages
-        print(f"Number of messages in {test_metrics_topic}: {len(metrics)}")
-        for message in metrics:
-            print(message)
 
         assert kafka_consumer.end_offsets([trt_consumer]) == {trt_consumer: 200}
         assert kafka_consumer.end_offsets([tmt_consumer]) == {tmt_consumer: 1}
