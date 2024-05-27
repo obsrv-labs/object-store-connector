@@ -16,7 +16,9 @@ from tests.batch_setup import setup_obsrv_database  # noqa
 from object_store_connector.connector import ObjectStoreConnector
 
 
-class TestSource(ISourceConnector):
+
+
+class ObjectStoreConnector(ISourceConnector):
     def process(
         self,
         sc: SparkSession,
@@ -25,6 +27,7 @@ class TestSource(ISourceConnector):
         metrics_collector: MetricsCollector,
     ) -> DataFrame:
         df = sc.read.format("json").load("tests/sample_data/nyt_data_100.json.gz")
+        # print(df.show())
         yield df
 
         df1 = sc.read.format("json").load("tests/sample_data/nyt_data_100.json")
@@ -55,25 +58,26 @@ class TestBatchConnector(unittest.TestCase):
 
         config = yaml.safe_load(open(config_file_path))
 
-        config['connector_instance_id'] = "azure.new-york-taxi-data.1"
+        # config['connector_instance_id'] = "azure.new-york-taxi-data.1"
 
-        with open(
-            config_file_path, "w"
-        ) as config_file:
-            yaml.dump(config, config_file)
+        # with open(
+        #     config_file_path, "w"
+        # ) as config_file:
+        #     yaml.dump(config, config_file)
 
 
         self.assertEqual(os.path.exists(config_file_path), True)
 
         test_raw_topic = "azure.ingest"
         test_metrics_topic = "azure.metrics"
-
+        # import time
+        # time.sleep(100)
         kafka_consumer = KafkaConsumer(
             bootstrap_servers=config["kafka"]["broker-servers"],
-            group_id="test-group",
+            group_id="azure-test-group",
             enable_auto_commit=True,
         )
-
+        # time.sleep(100)
         trt_consumer = TopicPartition(test_raw_topic, 0)
         tmt_consumer = TopicPartition(test_metrics_topic, 0)
 
@@ -85,16 +89,20 @@ class TestBatchConnector(unittest.TestCase):
 
         print("Done processing....0")
 
-        import time
-        time.sleep(300)
+        # import time
+        # time.sleep(30)
+        all_messages = kafka_consumer.poll(timeout_ms=10000)
 
-        # metrics = []
-        # all_messages = kafka_consumer.poll(timeout_ms=10000)
-
+        metrics = []
         # for topic_partition, messages in all_messages.items():
         #     for message in messages:
         #         if topic_partition.topic == test_metrics_topic:
         #             metrics.append(message.value)
 
-        # assert kafka_consumer.end_offsets([trt_consumer]) == {trt_consumer: 200}
-        # assert kafka_consumer.end_offsets([tmt_consumer]) == {tmt_consumer: 1}
+        # Check number of messages
+        print(f"Number of messages in {test_metrics_topic}: {len(metrics)}")
+        for message in metrics:
+            print(message)
+        print("kkk",kafka_consumer.end_offsets([trt_consumer]))
+        assert kafka_consumer.end_offsets([trt_consumer]) == {trt_consumer: 200}
+        assert kafka_consumer.end_offsets([tmt_consumer]) == {tmt_consumer: 1}

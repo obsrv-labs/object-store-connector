@@ -23,7 +23,7 @@ def setup_obsrv_database(request):
     ) as config_file:
         config = yaml.safe_load(config_file)
 
-        # config["connector-instance-id"] = "test.new-york-taxi-data.1"
+        config["connector-instance-id"] = "azure.new-york-taxi-data.1"
 
         config["postgres"]["host"] = postgres.get_container_host_ip()
         config["postgres"]["port"] = postgres.get_exposed_port(5432)
@@ -32,16 +32,17 @@ def setup_obsrv_database(request):
         config["postgres"]["dbname"] = postgres.dbname
         config["kafka"]["broker-servers"] = kafka.get_bootstrap_server()
 
+    
+
     with open(
         os.path.join(os.path.dirname(__file__), "config/config.yaml"), "w"
     ) as config_file:
         yaml.dump(config, config_file)
-
+    
     create_tables(config)
 
     # clean up
     def remove_container():
-        print("Cleaning up the containers")
         postgres.stop()
         kafka.stop()
         try:
