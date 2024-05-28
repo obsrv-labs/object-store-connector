@@ -22,10 +22,12 @@ class AzureBlobStorage(BlobProvider):
         self.account_key = connector_config["source"]["credentials"]["account_key"]
         self.container_name = connector_config["source"]["containername"]
         self.blob_endpoint = connector_config["source"]["blob_endpoint"]
-        self.prefix = (connector_config["source"]["prefix"]
-                       if "prefix" in connector_config["source"]
-                       else "/")
-        # self.obj_prefix= f"wasb//:{self.container_name}@"
+        self.prefix = (
+            connector_config["source"]["prefix"]
+            if "prefix" in connector_config["source"]
+            else "/"
+            )
+        
         
 
         self.connection_string = f"DefaultEndpointsProtocol=https;AccountName={self.account_name};AccountKey={self.account_key};BlobEndpoint={self.blob_endpoint}" 
@@ -48,12 +50,15 @@ class AzureBlobStorage(BlobProvider):
         objects_info=[]
         if objects==None:
             raise Exception("No objects found")
-    
+        
         for obj in objects:
-            blob_location = f"wasb://{self.container_name}@storageemulator/{obj['name']}"
-            
+            if self.blob_endpoint==(f"http://127.0.0.1:10000/{self.account_name}"):
+                blob_location = f"wasb://{self.container_name}@storageemulator/{obj['name']}"
+                
+            else:
+                blob_location=f"https://{self.account_name}.blob.core.windows.net/{self.container_name/{obj['name']}}"
+                
             object_info = ObjectInfo(
-                    # location=f"{self.obj_prefix}{obj['name']}",
                     location=blob_location,
                     format=obj["name"].split(".")[-1],
                     file_size_kb=obj["size"] // 1024,
