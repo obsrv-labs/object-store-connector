@@ -17,12 +17,16 @@ from obsrv.models import ErrorData
 class AzureBlobStorage(BlobProvider):
     def __init__(self, connector_config: str)-> None:
         super().__init__()
-        self.config=connector_config
-        self.account_name = self.config["source"]["credentials"]["account_name"]
-        self.account_key = self.config["source"]["credentials"]["account_key"]
-        self.container_name = self.config["source"]["containername"]
-        self.blob_endpoint = self.config["source"]["blob_endpoint"]
-        self.prefix = self.config["source"]["prefix"]
+        self.connector_config=connector_config
+        self.account_name = self.connector_config["source"]["credentials"]["account_name"]
+        self.account_key = self.connector_config["source"]["credentials"]["account_key"]
+        self.container_name = self.connector_config["source"]["containername"]
+        self.blob_endpoint = self.connector_config["source"]["blob_endpoint"]
+        self.prefix = (
+            connector_config["source"]["prefix"]
+            if "prefix" in connector_config["source"]
+            else "/"
+            )
         
 
         self.connection_string = f"DefaultEndpointsProtocol=https;AccountName={self.account_name};AccountKey={self.account_key};BlobEndpoint={self.blob_endpoint}" 
@@ -47,7 +51,11 @@ class AzureBlobStorage(BlobProvider):
             raise Exception("No objects found")
     
         for obj in objects:
-            blob_location = f"wasb://{self.container_name}@storageemulator/{obj['name']}"
+            if self.blob_endpoint==(f"http://127.0.0.1:10000/{self.account_name}"):
+                blob_location = f"wasb://{self.container_name}@storageemulator/{obj['name']}"
+                
+            else:
+                blob_location=f"https://{self.account_name}.blob.core.windows.net/{self.container_name/{obj['name']}}"
             
             object_info = ObjectInfo(
                     location=blob_location,
@@ -112,7 +120,7 @@ class AzureBlobStorage(BlobProvider):
 
 
     def _list_blobs_in_container(self,ctx: ConnectorContext, metrics_collector) -> list:
-        self.container_name = self.config['source']['containername']
+        self.container_name = self.connector_config['source']['containername']
         
         summaries = []
         continuation_token = None
