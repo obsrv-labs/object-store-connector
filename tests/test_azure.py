@@ -76,37 +76,24 @@ class TestBatchConnector(unittest.TestCase):
         metrics = []
         metric_names={
                 'num_api_calls': 0, 
-                'new_objects_discovered': 0
+                'new_objects_discovered': 0,
+                'total_records_count':0
             }
         # num_api_calls=[]
         for topic_partition, messages in all_messages.items():
             for message in messages:
                 if topic_partition.topic == test_metrics_topic:
-                    # print("message of kafka",message.value)
-                    # message_val=json.loads(message.value.decode())
-                    # metric=message_val['edata']['metric']
-                    # print("metric of edata",metric)
-                    # if metric:
-                    #     print("num_api_calls",metric['num_api_calls'])
-                    # else:
-                    #     continue
-                    # metrics.append(message.value)
                     msg_val=json.loads(message.value.decode())
                     metrics.append(msg_val)
                 # print("msg_val",msg_val)
         # print("metrics",metrics)
         for metric in metrics:
-            metric_data = metric.get('edata', {}).get('metric', {})  # Get the 'metric' data from the current metric
-            for mn, val in metric_names.items():  # Iterate over metric_names dictionary
-                if mn in metric_data:  # Check if the current metric has the key 'mn'
+            metric_data = metric['edata']['metric']  
+            for mn, val in metric_names.items():  
+                if mn in metric_data:  
                     metric_names[mn] += metric_data[mn]
         print(metric_names)
-            # if data['edata']['metric']['num_api_calls']:
-            #     print("num_call",data['edata']['metric']['num_api_calls']) 
-            # elif data['edata']['metric']['new_objects_discovered']:
-            #     print("new_obj",data['edata']['metric']['new_objects_discovered']) 
-            # else:
-            #     continue
+           
         count=0
         assert kafka_consumer.end_offsets([trt_consumer]) == {trt_consumer: 200}
         count+=1
@@ -114,6 +101,6 @@ class TestBatchConnector(unittest.TestCase):
         assert kafka_consumer.end_offsets([tmt_consumer]) == {tmt_consumer: 9}
         count+=1
         print("count",count)
-        # assert kafka_consumer.metrics([tmt_consumer])=={tmt_consumer:76}
-        # print("sddd",kafka_consumer.metrics([tmt_consumer]))
-        
+        assert metric_names['num_api_calls'] == 5
+        assert metric_names['new_objects_discovered'] == 2
+        assert metric_names['total_records_count'] == 200
