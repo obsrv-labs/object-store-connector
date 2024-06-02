@@ -10,7 +10,7 @@ from azure.storage.blob import *
 
 def init_azurite():
     ## Init azurite
-    azurite= AzuriteContainer("mcr.microsoft.com/azure-storage/azurite:latest")
+    azurite= AzuriteContainer("mcr.microsoft.com/azure-storage/azurite:latest").with_bind_ports(10000,10000)
     azurite.start()
 
     blob_port= azurite.get_exposed_port(10000)
@@ -26,19 +26,18 @@ def init_azurite():
 
     blob_service_client=BlobServiceClient.from_connection_string(conn_str)
     
-
+    print("Blob sr url", azure_conf)
     
     container_name="test-container"
 
     blob_service_client.create_container(container_name)
-    
-    bloblist = ["/home/vince/repogit/object-store-connector/tests/sample_data/nyt_data_100.json","/home/vince/repogit/object-store-connector/tests/sample_data/nyt_data_100.json.gz"]
-    for blob in bloblist:
-        blob_name=blob.split("/")[-1]
-        blob_client = blob_service_client.get_blob_client(container_name,blob=blob_name)
-        with open(blob, "rb") as data:
+     
+    folder_path="/home/vince/repogit/object-store-connector/tests/sample_data"
+    for filename in os.listdir(folder_path):    
+        filepath=os.path.join(folder_path,filename)
+        blob_client = blob_service_client.get_blob_client(container_name,blob=filename)
+        with open(filepath, "rb") as data:
             blob_client.upload_blob(data)
-    
     return azure_conf
 
 

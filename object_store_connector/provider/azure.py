@@ -52,7 +52,9 @@ class AzureBlobStorage(BlobProvider):
             raise Exception("No objects found")
         
         for obj in objects:
-            if self.blob_endpoint==(f"http://127.0.0.1:10000/{self.account_name}"):
+            print("self.blob_endpoint",self.blob_endpoint)
+            host_ip=self.blob_endpoint.split("//")[-1].split("/")[0]
+            if self.blob_endpoint==(f"http://{host_ip}/{self.account_name}"):
                 blob_location = f"wasb://{self.container_name}@storageemulator/{obj['name']}"
                 
             else:
@@ -66,6 +68,7 @@ class AzureBlobStorage(BlobProvider):
                     tags= self.fetch_tags(obj['name'], metrics_collector)
                 )
             objects_info.append(object_info.to_json())
+        
         return objects_info
 
     
