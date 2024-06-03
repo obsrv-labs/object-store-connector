@@ -84,7 +84,7 @@ class TestBatchConnector(unittest.TestCase):
         # num_api_calls=[]
         for topic_partition, messages in all_messages.items():
             for message in messages:
-                if topic_partition.topic == test_raw_topic:
+                if topic_partition.topic == test_metrics_topic:
                     msg_val=json.loads(message.value.decode())
                     metrics.append(msg_val)
                     

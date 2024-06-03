@@ -229,8 +229,13 @@ class AzureBlobStorage(BlobProvider):
         try:
             
             new_dict = {tag['key']: tag['value'] for tag in tags}
-        
-            stripped_file_path = object.get("location").lstrip("wasb://")
+
+            location = object.get("location")
+            if location.startswith("wasb://"):
+                stripped_file_path = location.lstrip("wasb://")
+            elif location.startswith("https://"):
+                stripped_file_path = location.lstrip("https://")
+            
             obj = stripped_file_path.split("/")[-1]
  
             blob_client = BlobClient.from_connection_string(
