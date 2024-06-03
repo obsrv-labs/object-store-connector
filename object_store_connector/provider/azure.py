@@ -52,7 +52,6 @@ class AzureBlobStorage(BlobProvider):
             raise Exception("No objects found")
         
         for obj in objects:
-            print("self.blob_endpoint",self.blob_endpoint)
             host_ip=self.blob_endpoint.split("//")[-1].split("/")[0]
             if self.blob_endpoint==(f"http://{host_ip}/{self.account_name}"):
                 blob_location = f"wasb://{self.container_name}@storageemulator/{obj['name']}"
@@ -88,7 +87,7 @@ class AzureBlobStorage(BlobProvider):
             elif file_format == "json":
                 df = sc.read.format("json").option("multiLine", False).load(object_path)
             elif file_format == "csv":
-                df = sc.read.format("csv").option("header", True).load(object_path)
+                df = sc.read.format("csv").option("header", True,mode = "PERMISSIVE", columnNameOfCorruptRecord = "_corrupt_record").load(object_path)
             elif file_format == "parquet":
                 df = sc.read.parquet(object_path)
             
@@ -241,7 +240,7 @@ class AzureBlobStorage(BlobProvider):
             existing_tags.update(new_dict)
             
             blob_client.set_blob_tags(existing_tags)
-            
+            api_calls += 1
             metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
             
             return True

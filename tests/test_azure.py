@@ -27,7 +27,7 @@ class TestSource(ISourceConnector):
         metrics_collector: MetricsCollector,
     ) -> DataFrame:
         df = sc.read.format("json").load("tests/sample_data/nyt_data_100.json.gz")
-        print(df.show())
+    
         yield df
 
         df1 = sc.read.format("json").load("tests/sample_data/nyt_data_100.json")
@@ -77,30 +77,30 @@ class TestBatchConnector(unittest.TestCase):
         metric_names={
                 'num_api_calls': 0, 
                 'new_objects_discovered': 0,
-                'total_records_count':0
+                'total_records_count':0,
+                'num_records':0,
+                'failed_records_count':0
             }
         # num_api_calls=[]
         for topic_partition, messages in all_messages.items():
             for message in messages:
-                if topic_partition.topic == test_metrics_topic:
+                if topic_partition.topic == test_raw_topic:
                     msg_val=json.loads(message.value.decode())
                     metrics.append(msg_val)
-                # print("msg_val",msg_val)
-        # print("metrics",metrics)
+                    
         for metric in metrics:
             metric_data = metric['edata']['metric']  
             for mn, val in metric_names.items():  
                 if mn in metric_data:  
                     metric_names[mn] += metric_data[mn]
-        print(metric_names)
-           
-        count=0
+      
         assert kafka_consumer.end_offsets([trt_consumer]) == {trt_consumer: 200}
-        count+=1
-        print("count",count)
+       
         assert kafka_consumer.end_offsets([tmt_consumer]) == {tmt_consumer: 9}
-        count+=1
-        print("count",count)
-        assert metric_names['num_api_calls'] == 5
+        
+        
+        assert metric_names['num_api_calls'] == 7
         assert metric_names['new_objects_discovered'] == 2
         assert metric_names['total_records_count'] == 200
+        assert metric_names['num_records'] == 200
+        assert metric_names['failed_records_count'] == 0

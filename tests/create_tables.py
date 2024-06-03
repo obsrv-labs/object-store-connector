@@ -26,7 +26,7 @@ def init_azurite():
 
     blob_service_client=BlobServiceClient.from_connection_string(conn_str)
     
-    print("Blob sr url", azure_conf)
+    
     
     container_name="test-container"
 
@@ -172,7 +172,6 @@ def create_tables(config):
         cur.execute(ins_ds)
         cur.execute(ins_cr)
         cur.execute(ins_ci, (json.dumps(enc_config),))
-        # cur.execute("select * from connector_instances")
 
         conn.commit()
         conn.close()
