@@ -87,7 +87,7 @@ class AzureBlobStorage(BlobProvider):
             elif file_format == "json":
                 df = sc.read.format("json").option("multiLine", False).load(object_path)
             elif file_format == "csv":
-                df = sc.read.format("csv").option("header", True,mode = "PERMISSIVE", columnNameOfCorruptRecord = "_corrupt_record").load(object_path)
+                df = sc.read.format("csv").option("header", True).load(object_path)
             elif file_format == "parquet":
                 df = sc.read.parquet(object_path)
             
