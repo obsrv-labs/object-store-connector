@@ -57,7 +57,7 @@ class AzureBlobStorage(BlobProvider):
                 blob_location = f"wasb://{self.container_name}@storageemulator/{obj['name']}"
                 
             else:
-                blob_location=f"https://{self.account_name}.blob.core.windows.net/{self.container_name/{obj['name']}}"
+                blob_location=f"https://{self.account_name}.blob.core.windows.net/{self.container_name}/{obj['name']}"
                 
             object_info = ObjectInfo(
                     location=blob_location,
