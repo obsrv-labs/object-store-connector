@@ -6,7 +6,7 @@ postgres:
   port: 5432
 
 kafka:
-  bootstrap-servers: localhost:9092
+  broker-servers: localhost:9092
   telemetry-topic: obsrv-connectors-telemetry
   connector-metrics-topic: obsrv-connectors-metrics
   producer:
@@ -16,6 +16,7 @@ kafka:
 obsrv_encryption_key: strong_encryption_key_to_encrypt
 
 connector_instance_id: gcs.new-york-taxi-data.1
+connector_instance_id: azure.new-york-taxi-data.1
 
 building-block: rv-test
 env: local

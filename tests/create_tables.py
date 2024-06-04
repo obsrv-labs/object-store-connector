@@ -1,5 +1,6 @@
 import json
 import os
+<<<<<<< HEAD
 import psycopg2
 import yaml
 from obsrv.utils import EncryptionUtil
@@ -51,10 +52,54 @@ def init_minio(connector_config):
         print(f"Unexpected error: {e}")
 
     return minio_conf
+=======
+
+import psycopg2
+import yaml
+
+from obsrv.utils import EncryptionUtil
+from testcontainers.azurite import AzuriteContainer
+from azure.storage.blob import *
+
+def init_azurite():
+    
+    azurite= AzuriteContainer("mcr.microsoft.com/azure-storage/azurite:latest").with_bind_ports(10000,10000)
+    azurite.start()
+
+    blob_port= azurite.get_exposed_port(10000)
+    conn_str=azurite.get_connection_string()
+    acc_name=azurite.account_name
+    acc_key=azurite.account_key
+
+    azure_conf = {
+        "accountName":acc_name,
+        "accountKey":acc_key,
+        "blobEndpoint":f"http://{azurite.get_container_host_ip()}:{blob_port}/{acc_name}"
+    }
+
+    blob_service_client=BlobServiceClient.from_connection_string(conn_str)
+    
+    
+    
+    container_name="test-container"
+
+    blob_service_client.create_container(container_name)
+     
+    folder_path="/home/vince/repogit/object-store-connector/tests/sample_data"
+    for filename in os.listdir(folder_path):    
+        filepath=os.path.join(folder_path,filename)
+        blob_client = blob_service_client.get_blob_client(container_name,blob=filename)
+        with open(filepath, "rb") as data:
+            blob_client.upload_blob(data)
+    return azure_conf
+
+
+>>>>>>> azure-connector-tests
 
 
 def create_tables(config):
     enc = EncryptionUtil(config["obsrv_encryption_key"])
+<<<<<<< HEAD
     minio_container= MinioContainer("minio/minio:latest")
     minio_container.start()
     
@@ -76,6 +121,11 @@ def create_tables(config):
     # Initialize Minio client
     minio_conf = init_minio(connector_config)
 
+=======
+
+    azure_conf = init_azurite()
+   
+>>>>>>> azure-connector-tests
     datasets = """
         CREATE TABLE IF NOT EXISTS datasets (
             id TEXT PRIMARY KEY,
@@ -146,28 +196,60 @@ def create_tables(config):
 
     ins_ds = """
         INSERT INTO datasets (id, dataset_id, type, name, validation_config, extraction_config, dedup_config, data_schema, denorm_config, router_config, dataset_config, tags, data_version, status, created_by, updated_by, created_date, updated_date, published_date) VALUES
+<<<<<<< HEAD
         ('new-york-taxi-data', 'new-york-taxi-data', 'dataset', 'new-york-taxi-data', '{"validate": true, "mode": "Strict", "validation_mode": "Strict"}', '{"is_batch_event": false}', '{"drop_duplicates": true, "dedup_key": "tripID", "dedup_period": 604800}', '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"tripID":{"type":"string","suggestions":[{"message":"The Property tripID appears to be uuid format type.","advice":"Suggest to not to index the high cardinal columns","resolutionType":"DEDUP","severity":"LOW","path":"properties.tripID"}],"arrival_format":"text","data_type":"string"}},"additionalProperties":false}', '{}', '{"topic": "new-york-taxi-data"}', '{"data_key": "", "timestamp_key": "tpep_pickup_datetime", "exclude_fields": [], "entry_topic": "s3.ingest", "redis_db_host": "obsrv-dedup-redis-master.redis.svc.cluster.local", "redis_db_port": 6379, "index_data": true, "redis_db": 0}', '{}', '1', 'Live', 'SYSTEM', 'SYSTEM', '2024-03-27 06:48:35.993478', '2024-03-27 06:48:35.993478', '2024-03-27 06:48:35.993478');
+=======
+        ('new-york-taxi-data', 'new-york-taxi-data', 'dataset', 'new-york-taxi-data', '{"validate": true, "mode": "Strict", "validation_mode": "Strict"}', '{"is_batch_event": false}', '{"drop_duplicates": true, "dedup_key": "tripID", "dedup_period": 604800}', '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"tripID":{"type":"string","suggestions":[{"message":"The Property tripID appears to be uuid format type.","advice":"Suggest to not to index the high cardinal columns","resolutionType":"DEDUP","severity":"LOW","path":"properties.tripID"}],"arrival_format":"text","data_type":"string"}},"additionalProperties":false}', '{}', '{"topic": "new-york-taxi-data"}', '{"data_key": "", "timestamp_key": "tpep_pickup_datetime", "exclude_fields": [], "entry_topic": "azure.ingest", "redis_db_host": "obsrv-dedup-redis-master.redis.svc.cluster.local", "redis_db_port": 6379, "index_data": true, "redis_db": 0}', '{}', '1', 'Live', 'SYSTEM', 'SYSTEM', '2024-03-27 06:48:35.993478', '2024-03-27 06:48:35.993478', '2024-03-27 06:48:35.993478');
+>>>>>>> azure-connector-tests
     """
 
     # ins_ds = """
     #     INSERT INTO datasets (id, dataset_id, type, name, dataset_config, status, created_by, updated_by) VALUES
+<<<<<<< HEAD
     #     ('new-york-taxi-data', 'new-york-taxi-data', 'dataset', 'new-york-taxi-data', '{"entry_topic": "test.ingest"}', 'Live', 'SYSTEM', 'SYSTEM');
+=======
+    #     ('new-york-taxi-data', 'new-york-taxi-data', 'dataset', 'new-york-taxi-data', '{"entry_topic": "azure.ingest"}', 'Live', 'SYSTEM', 'SYSTEM');
+>>>>>>> azure-connector-tests
     # """
 
     ins_cr = """
         INSERT INTO connector_registry (id, version, type, category, name, description, technology, licence, owner, iconURL, status, created_by, updated_by, updated_date) VALUES
+<<<<<<< HEAD
         ('s3.1', '1', 'source', 'object', 'test_reader', 'test_reader', 'Python', 'Apache 2.0', 'ravi@obsrv.ai', 'http://localhost', 'Live', 'SYSTEM', 'SYSTEM', now());
     """
 
 
+=======
+        ('azure.1', '1', 'source', 'object', 'test_reader', 'test_reader', 'Python', 'Apache 2.0', 'ravi@obsrv.ai', 'http://localhost', 'Live', 'SYSTEM', 'SYSTEM', now());
+    """
+
+    connector_config = json.dumps(
+        {
+        "source":{
+            "type":"azure_blob",
+            "credentials":{
+                "account_name":azure_conf['accountName'],
+                "account_key":azure_conf['accountKey']
+            },
+        "containername":"test-container",
+        "blob_endpoint":azure_conf['blobEndpoint'],
+        "prefix":"/"
+        }})
+>>>>>>> azure-connector-tests
     enc_config = enc.encrypt(connector_config)
 
     ins_ci = """
         INSERT INTO connector_instances (id, dataset_id, connector_id, connector_type, connector_config, operations_config, status, connector_state, connector_stats, created_by, updated_by, created_date, updated_date, published_date) VALUES
+<<<<<<< HEAD
         ('s3.new-york-taxi-data.1', 'new-york-taxi-data', 's3.1', 'source', %s, '{}', 'Live', '{}', '{}', 'SYSTEM', 'SYSTEM', now(), now(), now()
         );
     """
   
+=======
+        ('azure.new-york-taxi-data.1', 'new-york-taxi-data', 'azure.1', 'source', %s, '{}', 'Live', '{}', '{}', 'SYSTEM', 'SYSTEM', now(), now(), now()
+        );
+    """
+>>>>>>> azure-connector-tests
 
     with open(
         os.path.join(os.path.dirname(__file__), "config/config.yaml"), "r"
@@ -182,6 +264,7 @@ def create_tables(config):
         )
 
         cur = conn.cursor()
+<<<<<<< HEAD
         try : 
             cur.execute(datasets)
             cur.execute(connector_registry)
@@ -200,3 +283,16 @@ def create_tables(config):
             minio_container.stop()
 
         return
+=======
+
+        cur.execute(datasets)
+        cur.execute(connector_registry)
+        cur.execute(connector_instances)
+        cur.execute(indexes)
+        cur.execute(ins_ds)
+        cur.execute(ins_cr)
+        cur.execute(ins_ci, (json.dumps(enc_config),))
+
+        conn.commit()
+        conn.close()
+>>>>>>> azure-connector-tests

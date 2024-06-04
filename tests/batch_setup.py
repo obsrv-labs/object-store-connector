@@ -1,8 +1,10 @@
 import os
+
 import pytest
 import yaml
 from testcontainers.kafka import KafkaContainer
 from testcontainers.postgres import PostgresContainer
+
 from tests.create_tables import create_tables
 
 # import psycopg2
@@ -22,6 +24,7 @@ def setup_obsrv_database(request):
         config = yaml.safe_load(config_file)
 
         config["connector-instance-id"] = "s3.new-york-taxi-data.1"
+        config["connector-instance-id"] = "azure.new-york-taxi-data.1"
 
         config["postgres"]["host"] = postgres.get_container_host_ip()
         config["postgres"]["port"] = postgres.get_exposed_port(5432)
