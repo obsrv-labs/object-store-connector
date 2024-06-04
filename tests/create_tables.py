@@ -9,7 +9,7 @@ from testcontainers.azurite import AzuriteContainer
 from azure.storage.blob import *
 
 def init_azurite():
-    ## Init azurite
+    
     azurite= AzuriteContainer("mcr.microsoft.com/azure-storage/azurite:latest").with_bind_ports(10000,10000)
     azurite.start()
 

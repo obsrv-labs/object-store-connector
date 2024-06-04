@@ -1,6 +1,8 @@
 import os
 import unittest
 from typing import Any, Dict
+import sys
+sys.path.insert(0, '/home/vince/repogit/object-store-connector/object_store_connector')
 
 import pytest
 import yaml
@@ -81,7 +83,7 @@ class TestBatchConnector(unittest.TestCase):
                 'num_records':0,
                 'failed_records_count':0
             }
-        # num_api_calls=[]
+        
         for topic_partition, messages in all_messages.items():
             for message in messages:
                 if topic_partition.topic == test_metrics_topic:
