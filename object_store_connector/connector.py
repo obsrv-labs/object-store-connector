@@ -13,7 +13,10 @@ from provider.s3 import S3
 from pyspark.conf import SparkConf
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import lit
+from provider.gcs import GCS
 
+from provider.azure import AzureBlobStorage
+from models.object_info import ObjectInfo
 logger = LoggerController(__name__)
 
 MAX_RETRY_COUNT = 10
@@ -71,6 +74,11 @@ class ObjectStoreConnector(ISourceConnector):
     def _get_provider(self, connector_config: Dict[Any, Any]):
         if connector_config["source"]["type"] == "s3":
             self.provider = S3(connector_config)
+        elif connector_config["source"]["type"] == "azure_blob":
+            self.provider = AzureBlobStorage(connector_config)
+            
+        elif connector_config["source"]["type"] == "gcs":
+            self.provider = GCS(connector_config)
         else:
             ObsrvException(
                 ErrorData(
@@ -93,7 +101,6 @@ class ObjectStoreConnector(ISourceConnector):
                     "INVALID_CONTEXT", "building_block or env not found in context"
                 )
             )
-
         if not len(objects):
             num_files_discovered = ctx.stats.get_stat("num_files_discovered", 0)
             objects = self.provider.fetch_objects(ctx, metrics_collector)
@@ -177,4 +184,5 @@ class ObjectStoreConnector(ISourceConnector):
             if not any(tag["key"] == self.dedupe_tag for tag in obj.get("tags")):
                 to_be_processed.append(obj)
 
+        # return [objects[-1]] #TODO: Remove this line
         return to_be_processed
