@@ -1,12 +1,15 @@
 import json
 import os
-<<<<<<< HEAD
-import psycopg2
-import yaml
-from obsrv.utils import EncryptionUtil
 from testcontainers.minio import MinioContainer
 from minio import Minio
 from minio.error import S3Error
+
+import psycopg2
+import yaml
+
+from obsrv.utils import EncryptionUtil
+from testcontainers.azurite import AzuriteContainer
+from azure.storage.blob import *
 
 def init_minio(connector_config):
 
@@ -19,6 +22,11 @@ def init_minio(connector_config):
         secure=False
 
     )
+    minio_container= MinioContainer("minio/minio:latest")
+    minio_container.start()
+    print("get_clinet",minio_container.get_client())
+    print("get_config",minio_container.get_config())
+    print("get_host_ip",minio_container.get_container_host_ip())
     bucket_name = config['source']['bucket']
 
     #Create Bucket
@@ -31,8 +39,14 @@ def init_minio(connector_config):
     except S3Error as e:
         print(f"Error: {e}")
 
+    # folder_name = "tests/sample_data"
+    # file_path = os.path.join(os.getcwd(), folder_name)
+    # file_path="/home/vince/repogit/object-store-connector/tests/sample_data"
+
+    # for filename in os.listdir(file_path):    
+    #     filepath=os.path.join(file_path,filename)
     object_name="data.json"
-    file_path = "/root/GitRepo/obsrv-python-sdk/tests/sample_data/nyt_data_100.json"
+    file_path = "/home/vince/repogit/object-store-connector/tests/sample_data/nyt_data_100.json"
     c_type="application/json"
  
     #Upload Objects
@@ -52,14 +66,8 @@ def init_minio(connector_config):
         print(f"Unexpected error: {e}")
 
     return minio_conf
-=======
 
-import psycopg2
-import yaml
 
-from obsrv.utils import EncryptionUtil
-from testcontainers.azurite import AzuriteContainer
-from azure.storage.blob import *
 
 def init_azurite():
     
@@ -85,6 +93,8 @@ def init_azurite():
 
     blob_service_client.create_container(container_name)
      
+    # folder_name = "tests/sample_data"
+    # folder_path = os.path.join(os.getcwd(), folder_name)
     folder_path="/home/vince/repogit/object-store-connector/tests/sample_data"
     for filename in os.listdir(folder_path):    
         filepath=os.path.join(folder_path,filename)
@@ -94,12 +104,10 @@ def init_azurite():
     return azure_conf
 
 
->>>>>>> azure-connector-tests
 
 
 def create_tables(config):
     enc = EncryptionUtil(config["obsrv_encryption_key"])
-<<<<<<< HEAD
     minio_container= MinioContainer("minio/minio:latest")
     minio_container.start()
     
@@ -121,11 +129,9 @@ def create_tables(config):
     # Initialize Minio client
     minio_conf = init_minio(connector_config)
 
-=======
 
     azure_conf = init_azurite()
    
->>>>>>> azure-connector-tests
     datasets = """
         CREATE TABLE IF NOT EXISTS datasets (
             id TEXT PRIMARY KEY,
@@ -196,31 +202,19 @@ def create_tables(config):
 
     ins_ds = """
         INSERT INTO datasets (id, dataset_id, type, name, validation_config, extraction_config, dedup_config, data_schema, denorm_config, router_config, dataset_config, tags, data_version, status, created_by, updated_by, created_date, updated_date, published_date) VALUES
-<<<<<<< HEAD
-        ('new-york-taxi-data', 'new-york-taxi-data', 'dataset', 'new-york-taxi-data', '{"validate": true, "mode": "Strict", "validation_mode": "Strict"}', '{"is_batch_event": false}', '{"drop_duplicates": true, "dedup_key": "tripID", "dedup_period": 604800}', '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"tripID":{"type":"string","suggestions":[{"message":"The Property tripID appears to be uuid format type.","advice":"Suggest to not to index the high cardinal columns","resolutionType":"DEDUP","severity":"LOW","path":"properties.tripID"}],"arrival_format":"text","data_type":"string"}},"additionalProperties":false}', '{}', '{"topic": "new-york-taxi-data"}', '{"data_key": "", "timestamp_key": "tpep_pickup_datetime", "exclude_fields": [], "entry_topic": "s3.ingest", "redis_db_host": "obsrv-dedup-redis-master.redis.svc.cluster.local", "redis_db_port": 6379, "index_data": true, "redis_db": 0}', '{}', '1', 'Live', 'SYSTEM', 'SYSTEM', '2024-03-27 06:48:35.993478', '2024-03-27 06:48:35.993478', '2024-03-27 06:48:35.993478');
-=======
         ('new-york-taxi-data', 'new-york-taxi-data', 'dataset', 'new-york-taxi-data', '{"validate": true, "mode": "Strict", "validation_mode": "Strict"}', '{"is_batch_event": false}', '{"drop_duplicates": true, "dedup_key": "tripID", "dedup_period": 604800}', '{"$schema":"https://json-schema.org/draft/2020-12/schema","type":"object","properties":{"tripID":{"type":"string","suggestions":[{"message":"The Property tripID appears to be uuid format type.","advice":"Suggest to not to index the high cardinal columns","resolutionType":"DEDUP","severity":"LOW","path":"properties.tripID"}],"arrival_format":"text","data_type":"string"}},"additionalProperties":false}', '{}', '{"topic": "new-york-taxi-data"}', '{"data_key": "", "timestamp_key": "tpep_pickup_datetime", "exclude_fields": [], "entry_topic": "azure.ingest", "redis_db_host": "obsrv-dedup-redis-master.redis.svc.cluster.local", "redis_db_port": 6379, "index_data": true, "redis_db": 0}', '{}', '1', 'Live', 'SYSTEM', 'SYSTEM', '2024-03-27 06:48:35.993478', '2024-03-27 06:48:35.993478', '2024-03-27 06:48:35.993478');
->>>>>>> azure-connector-tests
     """
 
     # ins_ds = """
     #     INSERT INTO datasets (id, dataset_id, type, name, dataset_config, status, created_by, updated_by) VALUES
-<<<<<<< HEAD
     #     ('new-york-taxi-data', 'new-york-taxi-data', 'dataset', 'new-york-taxi-data', '{"entry_topic": "test.ingest"}', 'Live', 'SYSTEM', 'SYSTEM');
-=======
     #     ('new-york-taxi-data', 'new-york-taxi-data', 'dataset', 'new-york-taxi-data', '{"entry_topic": "azure.ingest"}', 'Live', 'SYSTEM', 'SYSTEM');
->>>>>>> azure-connector-tests
     # """
 
     ins_cr = """
         INSERT INTO connector_registry (id, version, type, category, name, description, technology, licence, owner, iconURL, status, created_by, updated_by, updated_date) VALUES
-<<<<<<< HEAD
-        ('s3.1', '1', 'source', 'object', 'test_reader', 'test_reader', 'Python', 'Apache 2.0', 'ravi@obsrv.ai', 'http://localhost', 'Live', 'SYSTEM', 'SYSTEM', now());
-    """
-
-
-=======
-        ('azure.1', '1', 'source', 'object', 'test_reader', 'test_reader', 'Python', 'Apache 2.0', 'ravi@obsrv.ai', 'http://localhost', 'Live', 'SYSTEM', 'SYSTEM', now());
+        ('s3.1', '1', 'source', 'object', 'test_reader', 'test_reader', 'Python', 'Apache 2.0', 'ravi@obsrv.ai', 'http://localhost', 'Live', 'SYSTEM', 'SYSTEM', now()),
+     ('azure.1', '1', 'source', 'object', 'test_reader', 'test_reader', 'Python', 'Apache 2.0', 'ravi@obsrv.ai', 'http://localhost', 'Live', 'SYSTEM', 'SYSTEM', now());
     """
 
     connector_config = json.dumps(
@@ -235,21 +229,16 @@ def create_tables(config):
         "blob_endpoint":azure_conf['blobEndpoint'],
         "prefix":"/"
         }})
->>>>>>> azure-connector-tests
     enc_config = enc.encrypt(connector_config)
 
     ins_ci = """
         INSERT INTO connector_instances (id, dataset_id, connector_id, connector_type, connector_config, operations_config, status, connector_state, connector_stats, created_by, updated_by, created_date, updated_date, published_date) VALUES
-<<<<<<< HEAD
         ('s3.new-york-taxi-data.1', 'new-york-taxi-data', 's3.1', 'source', %s, '{}', 'Live', '{}', '{}', 'SYSTEM', 'SYSTEM', now(), now(), now()
-        );
-    """
+        ),
   
-=======
         ('azure.new-york-taxi-data.1', 'new-york-taxi-data', 'azure.1', 'source', %s, '{}', 'Live', '{}', '{}', 'SYSTEM', 'SYSTEM', now(), now(), now()
         );
     """
->>>>>>> azure-connector-tests
 
     with open(
         os.path.join(os.path.dirname(__file__), "config/config.yaml"), "r"
@@ -264,26 +253,6 @@ def create_tables(config):
         )
 
         cur = conn.cursor()
-<<<<<<< HEAD
-        try : 
-            cur.execute(datasets)
-            cur.execute(connector_registry)
-            cur.execute(connector_instances)
-            cur.execute(indexes)
-            cur.execute(ins_ds)
-            cur.execute(ins_cr)
-            cur.execute(ins_ci, (json.dumps(enc_config),))
-
-            conn.commit()
-        except Exception as e:
-            print(f"Error occurred: {e}")
-            conn.rollback()
-        finally:
-            conn.close()
-            minio_container.stop()
-
-        return
-=======
 
         cur.execute(datasets)
         cur.execute(connector_registry)
@@ -291,8 +260,7 @@ def create_tables(config):
         cur.execute(indexes)
         cur.execute(ins_ds)
         cur.execute(ins_cr)
-        cur.execute(ins_ci, (json.dumps(enc_config),))
+        cur.execute(ins_ci, (json.dumps(enc_config),(json.dumps(enc_config))))
 
         conn.commit()
         conn.close()
->>>>>>> azure-connector-tests

@@ -28,10 +28,14 @@ class AzureBlobStorage(BlobProvider):
             else "/"
             )
         
+        if self.blob_endpoint=="core.windows.net":
+            self.connection_string = f"DefaultEndpointsProtocol=https;AccountName={self.account_name};AccountKey={self.account_key};EndpointSuffix={self.blob_endpoint}" 
+        else:
+            self.connection_string = f"DefaultEndpointsProtocol=https;AccountName={self.account_name};AccountKey={self.account_key};BlobEndpoint={self.blob_endpoint}" 
+
+        self.container_client = ContainerClient.from_connection_string(self.connection_string,self.container_name)
         
 
-        self.connection_string = f"DefaultEndpointsProtocol=https;AccountName={self.account_name};AccountKey={self.account_key};BlobEndpoint={self.blob_endpoint}" 
-        self.container_client = ContainerClient.from_connection_string(self.connection_string,self.container_name)
 
 
     def get_spark_config(self, connector_config) -> SparkConf:
@@ -39,6 +43,8 @@ class AzureBlobStorage(BlobProvider):
         conf.setAppName("ObsrvObjectStoreConnector")
         conf.set("spark.jars.packages", "org.apache.hadoop:hadoop-azure:3.3.1")
         conf.set("fs.azure.storage.accountAuthType", "SharedKey")
+        conf.set("fs.azure", "org.apache.hadoop.fs.azure.NativeAzureFileSystem")
+        conf.set(f"fs.azure.account.key.{self.account_name}.blob.core.windows.net", self.account_key)
         conf.set("fs.azure.storage.accountKey", connector_config["source"]["credentials"]["account_key"])
         return conf
 
@@ -52,12 +58,12 @@ class AzureBlobStorage(BlobProvider):
             raise Exception("No objects found")
         
         for obj in objects:
-            host_ip=self.blob_endpoint.split("//")[-1].split("/")[0]
-            if self.blob_endpoint==(f"http://{host_ip}/{self.account_name}"):
-                blob_location = f"wasb://{self.container_name}@storageemulator/{obj['name']}"
+            
+            if self.blob_endpoint==("core.windows.net"):
+                blob_location=f"wasbs://{self.container_name}@{self.account_name}.blob.core.windows.net/{obj['name']}"
                 
             else:
-                blob_location=f"https://{self.account_name}.blob.core.windows.net/{self.container_name}/{obj['name']}"
+                blob_location = f"wasb://{self.container_name}@storageemulator/{obj['name']}"
                 
             object_info = ObjectInfo(
                     location=blob_location,
@@ -78,9 +84,9 @@ class AzureBlobStorage(BlobProvider):
             {"key": "object_path", "value": object_path}
         ]
         
-        
+    
         api_calls, errors, records_count = 0, 0, 0
-
+       
         try:
             if file_format == "jsonl":
                 df = sc.read.format("json").load(object_path)
@@ -124,7 +130,7 @@ class AzureBlobStorage(BlobProvider):
 
     def _list_blobs_in_container(self,ctx: ConnectorContext, metrics_collector) -> list:
         self.container_name = self.connector_config['source']['containername']
-        
+
         summaries = []
         continuation_token = None
         file_formats = {
@@ -188,7 +194,6 @@ class AzureBlobStorage(BlobProvider):
             {"key": "method_name", "value": "get_blob_tags"},
             {"key": "object_path", "value": object_path}
         ]
-
         api_calls, errors = 0, 0
         try:
             blob_client = BlobClient.from_connection_string(
@@ -198,8 +203,6 @@ class AzureBlobStorage(BlobProvider):
             
             api_calls += 1
             metrics_collector.collect("num_api_calls", api_calls, addn_labels=labels)
-            for k, v in tags.items():
-                print(k, v)
             
             return [Tag(key,value) for key,value in tags.items()]
 
@@ -225,18 +228,11 @@ class AzureBlobStorage(BlobProvider):
             {"key": "object_path", "value": object.get('location')}
         ]
         api_calls, errors = 0, 0
-
         try:
             
             new_dict = {tag['key']: tag['value'] for tag in tags}
-
             location = object.get("location")
-            if location.startswith("wasb://"):
-                stripped_file_path = location.lstrip("wasb://")
-            elif location.startswith("https://"):
-                stripped_file_path = location.lstrip("https://")
-            
-            obj = stripped_file_path.split("/")[-1]
+            obj = location.split("/")[-1]
  
             blob_client = BlobClient.from_connection_string(
                 conn_str=self.connection_string, container_name=self.container_name, blob_name=obj

@@ -2,7 +2,7 @@ import os
 import unittest
 from typing import Any, Dict
 import sys
-sys.path.insert(0, '/root/GitRepo/object-store-connector/object_store_connector')
+sys.path.insert(0, '/home/vince/repogit/object-store-connector/object_store_connector')
 
 # from connector import Info
 
@@ -12,7 +12,8 @@ import yaml
 from kafka import KafkaConsumer, TopicPartition
 from pyspark.conf import SparkConf
 from pyspark.sql import DataFrame, SparkSession
-from connector import ObjectStoreConnector
+#
+from object_store_connector.connector import ObjectStoreConnector
 from obsrv.connector import ConnectorContext, MetricsCollector
 from obsrv.connector.batch import ISourceConnector, SourceConnector
 from obsrv.job.batch import get_base_conf
@@ -20,7 +21,7 @@ from tests.batch_setup import setup_obsrv_database  # noqa
 
 
 
-class ObjectStoreConnector(ISourceConnector):
+class TestSource(ISourceConnector):
     def process(
         self,
         sc: SparkSession,
