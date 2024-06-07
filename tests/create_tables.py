@@ -22,11 +22,7 @@ def init_minio(connector_config):
         secure=False
 
     )
-    minio_container= MinioContainer("minio/minio:latest")
-    minio_container.start()
-    print("get_clinet",minio_container.get_client())
-    print("get_config",minio_container.get_config())
-    print("get_host_ip",minio_container.get_container_host_ip())
+   
     bucket_name = config['source']['bucket']
 
     #Create Bucket
