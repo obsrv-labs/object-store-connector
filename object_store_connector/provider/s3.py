@@ -175,27 +175,13 @@ class S3(BlobProvider):
         ]
         api_calls, errors, records_count = 0, 0, 0
         try:
-            if file_format == "jsonl":
-                df = sc.read.format("json").load(object_path)
-            elif file_format == "json":
-                df = sc.read.format("json").option("multiLine", True).load(object_path)
-            elif file_format == "csv":
-                df = sc.read.format("csv").option("header", True).load(object_path)
-            elif file_format == "parquet":
-                df = sc.read.format("parquet").load(object_path)
-            else:
-                raise ObsrvException(
-                    ErrorData(
-                        "UNSUPPORTED_FILE_FORMAT",
-                        f"unsupported file format: {file_format}",
-                    )
-                )
+            df = super().read_file(objectPath=object_path, sc=sc, metrics_collector=metrics_collector, file_format=file_format)
             records_count = df.count()
             api_calls += 1
             metrics_collector.collect(
-                {"num_api_calls": api_calls, "num_records": records_count},
-                addn_labels=labels,
-            )
+            {"num_api_calls": api_calls, "num_records": records_count},
+            addn_labels=labels,
+        )
             return df
         except (BotoCoreError, ClientError) as exception:
             errors += 1

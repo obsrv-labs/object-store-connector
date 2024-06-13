@@ -47,7 +47,36 @@ class BlobProvider(ABC):
         self,
         objectPath: str,
         metrics_collector: MetricsCollector,
+        file_format: str,
         config: Dict[str, Any] = None,
         sc: SparkSession = None,
     ) -> DataFrame:
         pass
+    
+    @final
+    def read_file(self,
+        objectPath: str,
+        metrics_collector: MetricsCollector,
+        file_format: str,
+        config: Dict[str, Any] = None,
+        sc: SparkSession = None,
+    ) -> DataFrame:
+        print("reading objects...")
+        if file_format == "jsonl":
+            print("Creating dataframe ...")
+            df = sc.read.format("json").load(objectPath)
+        elif file_format == "json":
+            df = sc.read.format("json").option("multiLine", True).load(objectPath)
+        elif file_format == "csv":
+            df = sc.read.format("csv").option("header", True).load(objectPath)
+        elif file_format == "parquet":
+            df = sc.read.format("parquet").load(objectPath)
+        else:
+            raise ObsrvException(
+                ErrorData(
+                    "UNSUPPORTED_FILE_FORMAT",
+                    f"unsupported file format: {file_format}",
+                )
+            )
+        return df
+
