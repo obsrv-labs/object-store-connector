@@ -175,13 +175,18 @@ class S3(BlobProvider):
         ]
         api_calls, errors, records_count = 0, 0, 0
         try:
-            df = super().read_file(objectPath=object_path, sc=sc, metrics_collector=metrics_collector, file_format=file_format)
+            df = super().read_file(
+                objectPath=object_path,
+                sc=sc,
+                metrics_collector=metrics_collector,
+                file_format=file_format,
+            )
             records_count = df.count()
             api_calls += 1
             metrics_collector.collect(
-            {"num_api_calls": api_calls, "num_records": records_count},
-            addn_labels=labels,
-        )
+                {"num_api_calls": api_calls, "num_records": records_count},
+                addn_labels=labels,
+            )
             return df
         except (BotoCoreError, ClientError) as exception:
             errors += 1

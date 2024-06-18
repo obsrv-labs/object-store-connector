@@ -52,9 +52,10 @@ class BlobProvider(ABC):
         sc: SparkSession = None,
     ) -> DataFrame:
         pass
-    
+
     @final
-    def read_file(self,
+    def read_file(
+        self,
         objectPath: str,
         metrics_collector: MetricsCollector,
         file_format: str,
@@ -79,4 +80,3 @@ class BlobProvider(ABC):
                 )
             )
         return df
-
