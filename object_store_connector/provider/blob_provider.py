@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List
+from typing import Any, Dict, List, final
 
 from models.object_info import ObjectInfo, Tag
 from obsrv.connector import MetricsCollector
