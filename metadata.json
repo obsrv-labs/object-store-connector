@@ -13,7 +13,7 @@
         "licence": "MIT",
         "owner": "Sunbird",
         "main_class": null,
-        "main_program": "object_store_connector"
+        "main_program": "object_store_connector/__main__.py"
     },
     "connectors": [
         {
