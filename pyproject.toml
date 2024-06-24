@@ -10,6 +10,7 @@ packages = [
 ]
 
 include = [
+    "requirements.txt",
     "libs/*.jar",
     "ui-config.json",
     "metadata.json",
