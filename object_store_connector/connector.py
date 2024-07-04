@@ -47,8 +47,8 @@ class ObjectStoreConnector(ISourceConnector):
         ctx.state.put_state("status", self.running_state)
         ctx.state.save_state()
         self.max_retries = (
-            connector_config["max_retries"]
-            if "max_retries" in connector_config
+            connector_config["source_max_retries"]
+            if "source_max_retries" in connector_config
             else MAX_RETRY_COUNT
         )
         self._get_provider(connector_config)

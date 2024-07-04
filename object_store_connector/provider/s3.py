@@ -62,11 +62,11 @@ class S3(BlobProvider):
         )  # Use simple AWS credentials provider
         conf.set(
             "spark.hadoop.fs.s3a.access.key",
-            connector_config["access_key"],
+            connector_config["source_credentials_access_key"],
         )  # AWS access key
         conf.set(
             "spark.hadoop.fs.s3a.secret.key",
-            connector_config["secret_key"],
+            connector_config["source_credentials_secret_key"],
         )  # AWS secret key
         conf.set("com.amazonaws.services.s3.enableV4", "true")  # Enable V4 signature
 
@@ -214,12 +214,12 @@ class S3(BlobProvider):
     def _get_client(self):
         session = boto3.Session(
             aws_access_key_id=self.connector_config[
-                "access_key"
+                "source_credentials_access_key"
             ],
             aws_secret_access_key=self.connector_config[
-                "secret_key"
+                "source_credentials_secret_key"
             ],
-            region_name=self.connector_config["region"],
+            region_name=self.connector_config["source_credentials_region"],
         )
         return session.client("s3")
 
