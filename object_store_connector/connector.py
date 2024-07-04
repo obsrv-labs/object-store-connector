@@ -47,8 +47,8 @@ class ObjectStoreConnector(ISourceConnector):
         ctx.state.put_state("status", self.running_state)
         ctx.state.save_state()
         self.max_retries = (
-            connector_config["source"]["max_retries"]
-            if "max_retries" in connector_config["source"]
+            connector_config["max_retries"]
+            if "max_retries" in connector_config
             else MAX_RETRY_COUNT
         )
         self._get_provider(connector_config)
@@ -69,14 +69,14 @@ class ObjectStoreConnector(ISourceConnector):
         return SparkConf()
 
     def _get_provider(self, connector_config: Dict[Any, Any]):
-        if connector_config["source"]["type"] == "s3":
+        if connector_config["source_type"] == "s3":
             self.provider = S3(connector_config)
         else:
             ObsrvException(
                 ErrorData(
                     "INVALID_PROVIDER",
                     "provider not supported: {}".format(
-                        connector_config["source"]["type"]
+                        connector_config["source_type"]
                     ),
                 )
             )
