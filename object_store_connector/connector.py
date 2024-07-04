@@ -3,16 +3,17 @@ import json
 import time
 from typing import Any, Dict, Iterator
 
-from models.object_info import ObjectInfo
 from obsrv.common import ObsrvException
 from obsrv.connector import ConnectorContext, MetricsCollector
 from obsrv.connector.batch import ISourceConnector
 from obsrv.models import ErrorData, ExecutionState, StatusCode
 from obsrv.utils import LoggerController
-from provider.s3 import S3
 from pyspark.conf import SparkConf
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import lit
+
+from models.object_info import ObjectInfo
+from provider.s3 import S3
 
 logger = LoggerController(__name__)
 

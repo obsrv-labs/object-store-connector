@@ -3,14 +3,15 @@ from typing import List
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-from models.object_info import ObjectInfo, Tag
 from obsrv.common import ObsrvException
 from obsrv.connector import ConnectorContext, MetricsCollector
 from obsrv.job.batch import get_base_conf
 from obsrv.models import ErrorData
-from provider.blob_provider import BlobProvider
 from pyspark.conf import SparkConf
 from pyspark.sql import DataFrame, SparkSession
+
+from models.object_info import ObjectInfo, Tag
+from provider.blob_provider import BlobProvider
 
 
 class S3(BlobProvider):
@@ -213,9 +214,7 @@ class S3(BlobProvider):
 
     def _get_client(self):
         session = boto3.Session(
-            aws_access_key_id=self.connector_config[
-                "source_credentials_access_key"
-            ],
+            aws_access_key_id=self.connector_config["source_credentials_access_key"],
             aws_secret_access_key=self.connector_config[
                 "source_credentials_secret_key"
             ],
