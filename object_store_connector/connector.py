@@ -3,16 +3,17 @@ import json
 import time
 from typing import Any, Dict, Iterator
 
-from models.object_info import ObjectInfo
 from obsrv.common import ObsrvException
 from obsrv.connector import ConnectorContext, MetricsCollector
 from obsrv.connector.batch import ISourceConnector
 from obsrv.models import ErrorData, ExecutionState, StatusCode
 from obsrv.utils import LoggerController
-from provider.s3 import S3
 from pyspark.conf import SparkConf
 from pyspark.sql import DataFrame, SparkSession
 from pyspark.sql.functions import lit
+
+from models.object_info import ObjectInfo
+from provider.s3 import S3
 
 logger = LoggerController(__name__)
 
@@ -47,8 +48,8 @@ class ObjectStoreConnector(ISourceConnector):
         ctx.state.put_state("status", self.running_state)
         ctx.state.save_state()
         self.max_retries = (
-            connector_config["source"]["max_retries"]
-            if "max_retries" in connector_config["source"]
+            connector_config["source_max_retries"]
+            if "source_max_retries" in connector_config
             else MAX_RETRY_COUNT
         )
         self._get_provider(connector_config)
@@ -69,14 +70,14 @@ class ObjectStoreConnector(ISourceConnector):
         return SparkConf()
 
     def _get_provider(self, connector_config: Dict[Any, Any]):
-        if connector_config["source"]["type"] == "s3":
+        if connector_config["source_type"] == "s3":
             self.provider = S3(connector_config)
         else:
             ObsrvException(
                 ErrorData(
                     "INVALID_PROVIDER",
                     "provider not supported: {}".format(
-                        connector_config["source"]["type"]
+                        connector_config["source_type"]
                     ),
                 )
             )

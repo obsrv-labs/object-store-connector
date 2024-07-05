@@ -1,7 +1,8 @@
 import os
 
-from connector import ObjectStoreConnector
 from obsrv.connector.batch import SourceConnector
+
+from connector import ObjectStoreConnector
 
 # from obsrv.utils import Config
 
