@@ -7,8 +7,9 @@ from models.object_info import ObjectInfo
 from obsrv.common import ObsrvException
 from obsrv.connector import ConnectorContext, MetricsCollector
 from obsrv.connector.batch import ISourceConnector
-from obsrv.models import ErrorData, ExecutionState, StatusCode
+from obsrv.models.data_models import ErrorData, ExecutionState, StatusCode
 from obsrv.utils import LoggerController
+from provider.hdfs import HDFS
 from provider.s3 import S3
 from pyspark.conf import SparkConf
 from pyspark.sql import DataFrame, SparkSession
@@ -69,7 +70,10 @@ class ObjectStoreConnector(ISourceConnector):
         return SparkConf()
 
     def _get_provider(self, connector_config: Dict[Any, Any]):
-        if connector_config["source"]["type"] == "s3":
+        print("this is connector config",connector_config)
+        if connector_config["source"]["type"] == "hdfs":
+            self.provider = HDFS(connector_config) 
+        elif connector_config["source"]["type"] == "s3":
             self.provider = S3(connector_config)
         else:
             ObsrvException(

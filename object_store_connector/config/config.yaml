@@ -13,9 +13,9 @@ kafka:
     compression: snappy
     max-request-size: 1000000 # 1MB {1M: 1000000, 10M: 10000000, 5M: 5000000}
 
-obsrv_encryption_key: random_thirty_two_encrypt_string
+obsrv_encryption_key: strong_encryption_key_to_encrypt
 
-connector_instance_id: s3.new-york-taxi-data.1
+connector_instance_id: hdfs.new-york-taxi-data.1
 
 building-block: rv-test
 env: local
