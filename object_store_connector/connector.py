@@ -101,7 +101,7 @@ class ObjectStoreConnector(ISourceConnector):
         if not len(objects):
             num_files_discovered = ctx.stats.get_stat("num_files_discovered", 0)
             objects = self.provider.fetch_objects(ctx, metrics_collector)
-            objects = self._exclude_processed_objects(ctx, objects)
+            # objects = self._exclude_processed_objects(ctx, objects)
             metrics_collector.collect("new_objects_discovered", len(objects))
             ctx.state.put_state("to_process", objects)
             ctx.state.save_state()
@@ -127,7 +127,7 @@ class ObjectStoreConnector(ISourceConnector):
                 metrics_collector=metrics_collector,
                 file_format=ctx.data_format,
             )
-
+            print("process objects",df)
             if df is None:
                 obj["num_of_retries"] += 1
                 if obj["num_of_retries"] < self.max_retries:
@@ -144,17 +144,18 @@ class ObjectStoreConnector(ISourceConnector):
             else:
                 df = self._append_custom_meta(sc, df, obj)
                 obj["download_time"] = time.time() - obj.get("start_processing_time")
-                if not self.provider.update_tag(
-                    object=obj,
-                    tags=[{"key": self.dedupe_tag, "value": self.success_state}],
-                    metrics_collector=metrics_collector,
-                ):
-                    break
+                # if not self.provider.update_tag(
+                #     object=obj,
+                #     tags=[{"key": self.dedupe_tag, "value": self.success_state}],
+                #     metrics_collector=metrics_collector,
+                # ):
+                #     break
                 ctx.state.put_state("to_process", self.objects[i + 1 :])
                 ctx.state.save_state()
                 num_files_processed += 1
                 ctx.stats.put_stat("num_files_processed", num_files_processed)
                 obj["end_processing_time"] = time.time()
+                print("end time",obj["end_processing_time"])
                 yield df
 
         ctx.stats.save_stats()
@@ -173,6 +174,7 @@ class ObjectStoreConnector(ISourceConnector):
             "in_time": object.get("in_time"),
         }
         df = df.withColumn("_addn_source_meta", lit(json.dumps(addn_meta, default=str)))
+        print("appended DataFrame",df)
         return df
 
     def _exclude_processed_objects(self, ctx: ConnectorContext, objects):
@@ -180,5 +182,6 @@ class ObjectStoreConnector(ISourceConnector):
         for obj in objects:
             if not any(tag["key"] == self.dedupe_tag for tag in obj.get("tags")):
                 to_be_processed.append(obj)
-
+        print("objects to be processed",to_be_processed)
         return to_be_processed
+        
