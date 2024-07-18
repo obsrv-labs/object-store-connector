@@ -3,25 +3,26 @@ from typing import List
 
 import boto3
 from botocore.exceptions import BotoCoreError, ClientError
-from models.object_info import ObjectInfo, Tag
 from obsrv.common import ObsrvException
 from obsrv.connector import ConnectorContext, MetricsCollector
 from obsrv.job.batch import get_base_conf
 from obsrv.models import ErrorData
-from provider.blob_provider import BlobProvider
 from pyspark.conf import SparkConf
 from pyspark.sql import DataFrame, SparkSession
+
+from models.object_info import ObjectInfo, Tag
+from provider.blob_provider import BlobProvider
 
 
 class S3(BlobProvider):
     def __init__(self, connector_config) -> None:
         super().__init__()
         self.connector_config = connector_config
-        self.bucket = connector_config["source"]["bucket"]
+        self.bucket = connector_config["source_bucket"]
         # self.prefix = connector_config.get('prefix', '/') # TODO: Implement partitioning support
         self.prefix = (
-            connector_config["source"]["prefix"]
-            if "prefix" in connector_config["source"]
+            connector_config["source_prefix"]
+            if "source_prefix" in connector_config
             else "/"
         )
         self.obj_prefix = f"s3a://{self.bucket}/"
@@ -62,11 +63,11 @@ class S3(BlobProvider):
         )  # Use simple AWS credentials provider
         conf.set(
             "spark.hadoop.fs.s3a.access.key",
-            connector_config["source"]["credentials"]["access_key"],
+            connector_config["source_credentials_access_key"],
         )  # AWS access key
         conf.set(
             "spark.hadoop.fs.s3a.secret.key",
-            connector_config["source"]["credentials"]["secret_key"],
+            connector_config["source_credentials_secret_key"],
         )  # AWS secret key
         conf.set("com.amazonaws.services.s3.enableV4", "true")  # Enable V4 signature
 
@@ -175,21 +176,12 @@ class S3(BlobProvider):
         ]
         api_calls, errors, records_count = 0, 0, 0
         try:
-            if file_format == "jsonl":
-                df = sc.read.format("json").load(object_path)
-            elif file_format == "json":
-                df = sc.read.format("json").option("multiLine", True).load(object_path)
-            elif file_format == "csv":
-                df = sc.read.format("csv").option("header", True).load(object_path)
-            elif file_format == "parquet":
-                df = sc.read.format("parquet").load(object_path)
-            else:
-                raise ObsrvException(
-                    ErrorData(
-                        "UNSUPPORTED_FILE_FORMAT",
-                        f"unsupported file format: {file_format}",
-                    )
-                )
+            df = super().read_file(
+                objectPath=object_path,
+                sc=sc,
+                metrics_collector=metrics_collector,
+                file_format=file_format,
+            )
             records_count = df.count()
             api_calls += 1
             metrics_collector.collect(
@@ -222,18 +214,16 @@ class S3(BlobProvider):
 
     def _get_client(self):
         session = boto3.Session(
-            aws_access_key_id=self.connector_config["source"]["credentials"][
-                "access_key"
+            aws_access_key_id=self.connector_config["source_credentials_access_key"],
+            aws_secret_access_key=self.connector_config[
+                "source_credentials_secret_key"
             ],
-            aws_secret_access_key=self.connector_config["source"]["credentials"][
-                "secret_key"
-            ],
-            region_name=self.connector_config["source"]["credentials"]["region"],
+            region_name=self.connector_config["source_credentials_region"],
         )
         return session.client("s3")
 
     def _list_objects(self, ctx: ConnectorContext, metrics_collector) -> list:
-        bucket_name = self.connector_config["source"]["bucket"]
+        bucket_name = self.connector_config["source_bucket"]
         prefix = self.prefix
         summaries = []
         continuation_token = None
